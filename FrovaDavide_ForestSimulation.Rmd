@@ -50,15 +50,17 @@ cell_states <- c(
   "DryGrass", # 2
   "DenseTrees", # 3
   "Burning", # 4
-  "NormalForest" # 5
+  "NormalForest", # 5
+  "Burned"  #6
 )
 
 cell_states_colors <- c(
-  "Water" = "#0000FF", # Blue
-  "DryGrass" = "#ADFF2F", # GreenYellow
-  "DenseTrees" = "#006400", # DarkGreen
-  "Burning" = "#FF0000", # Red
-  "NormalForest" = "#008000" # Green
+  "#0000FF", # Blue / Water
+  "#ADFF2F", # GreenYellow / DryGrass
+  "#006400", # DarkGreen / DenseTrees
+  "#FF0000", # Red / Burning
+  "#008000", # Green / NormalForest
+  "#A9A9A9" # DarkGray / Burned
 )
 
 
@@ -75,8 +77,8 @@ initialize_grid <- function(rows, cols) {
 
   for (y in 1:rows) {
     for (x in 1:cols) {
-      # Sample from the indexes of the cell_states dictionary
-      status <- sample(seq_along(cell_states), 1)
+      # Sample from the indexes of the cell_states dictionary (without the burned state)
+      status <- sample(seq_along(cell_states):5, 1)
       grid$status[y, x] <- status
       grid$prob[y, x] <- 0.0 # Replace with your actual prob calculation
     }
@@ -104,8 +106,10 @@ plot_grid <- function(forest_grid) {
   flipped_grid <- apply(forest_grid, 2, rev)
   transposed_again <- t(flipped_grid)
 
+  # Get unique values to only take the colors needed (image will be angry otherwise)
+  colors <- sort(unique(as.vector(initial_state$status)))
   # Order the colors to match the cell states
-  colors <- cell_states_colors[cell_states]
+  colors <- sapply(colors, function(val) cell_states_colors[val])
 
   # Print the image of the grid
   image(transposed_again, col = colors)
@@ -117,7 +121,7 @@ plot_grid <- function(forest_grid) {
   # )
 }
 
-plot_grid(initial_state$status)
+# plot_grid(initial_state$status)
 ```
 
 
@@ -137,7 +141,7 @@ plot_3D <- function(forest_grid) {
   persp3d(x, y, z, col = colors, xlab = "X", ylab = "Y", zlab = "Prob")
 }
 
-plot_3D(initial_state)
+# plot_3D(initial_state)
 # plot_3D(next_state)
 ```
 
@@ -204,7 +208,7 @@ neighbours <- function(forest_grid, cell) {
 }
 
 
-test_neghs <- neighbours(initial_state, c(10, 10))
+# test_neghs <- neighbours(initial_state, c(10, 10))
 
 
 # test_neghs[[1]]
@@ -253,7 +257,8 @@ propagate <- function(cell, neighbours) {
         "2" = 0.125, # max = 1.0
         "3" = 0.05, # max = 0.4
         "4" = 0.0, # max = 0.0
-        "5" = 0.0875 # max = 0.7
+        "5" = 0.0875, # max = 0.7
+        "6" = 0.0 # max = 0.0
       )
     )
   })
@@ -283,13 +288,53 @@ and grid updates using the neighbours and propagate functions.
 <!-- TODO: Add pseudocode -->
 
 ```{R}
+# "Water",          # 1
+# "DryGrass",       # 2
+# "DenseTrees",     # 3
+# "Burning",        # 4
+# "NormalForest"    # 5
+# "Burned"          # 6
+
 update_grid <- function(forest_grid) {
   for (y in 1:ncol(forest_grid$status)) {
     for (x in 1:nrow(forest_grid$status)) {
+      # Get the current cell state
       cell_state <- forest_grid$status[y, x]
+      cell_prob <- forest_grid$prob[y, x]
+
+      # If the cell could burn, generate a random number and check with its probability
+      # if so, set them to burning and reset their prob
+      if (cell_state == 2 || cell_state == 3 || cell_state == 5) {
+        rand_value <- runif(1)
+        if (rand_value <= cell_prob) {
+          forest_grid$status[y, x] <- 4
+          forest_grid$prob[y, x] <- 0.0
+
+          cell_state <- 4
+          cell_prob <- 0.0
+        }
+      } else if (cell_state == 4) {
+        # If the cell is burning, and the random value gets the prob
+        # set it to burned and reset its prob, otherwise increase the prob of going out
+
+        rand_value <- runif(1)
+        if (rand_value <= cell_prob) {
+          forest_grid$status[y, x] <- 6
+          forest_grid$prob[y, x] <- 0.0
+
+          cell_state <- 6
+          cell_prob <- 0.0
+        } else {
+          # Increase the probability of going out
+          forest_grid$prob[y, x] <- forest_grid$prob[y, x] + 0.3
+          cell_prob <- cell_prob + 0.1
+        }
+      }
+
       # Get the neighbours of the current cell
       neghs <- neighbours(forest_grid = forest_grid["status"], cell = c(x, y))
 
+      # Create an "object" with the data needed from the propagate function
       propagate_cell <- c(
         "state" = cell_state,
         "coords" = c(
@@ -297,13 +342,17 @@ update_grid <- function(forest_grid) {
           "y" = y
         )
       )
+
+      # Compute the probabilities of the propagate of the neighbours cells
       probs_propagate <- propagate(propagate_cell, neghs)
 
+      # Foraech of the neighbours for which we have the probs. of ignition
+      # we sum it to the current prob. values of the forest_grid
+      # (Markov Chain) t_n = t_n-1 + something
       for (negIndex in 1:length(neghs)) {
         forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] <-
           forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] + probs_propagate[[negIndex]]
       }
-
 
     }
   }
@@ -316,12 +365,12 @@ update_grid <- function(forest_grid) {
 
 next_state <- update_grid(initial_state)
 
-# next_state <- update_grid(next_state)
+next_state <- update_grid(next_state)
 
-plot_grid(next_state$status)
+# plot_grid(next_state$status)
 
 plot_probs_and_states(next_state)
-plot_probs_and_states(next_state, FALSE)
+# plot_probs_and_states(next_state, FALSE)
 
 # plot_3D(next_state)
 ```
