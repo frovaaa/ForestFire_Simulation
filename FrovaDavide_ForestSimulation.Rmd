@@ -34,31 +34,62 @@ dense trees (DenseTrees), and a few initially burning areas (Burning). Label the
 as NormalForest. This grid will represent the initial state of the forest before the fire simulation
 begins.
 
+
+<!-- TODO: Add pseudocode -->
+
 ```{r}
 cell_states <- c(
-  "Water",        #1
-  "DryGrass",     #2
-  "DenseTrees",   #3
-  "Burning",      #4
-  "NormalForest"  #5
+  "Water", # 1
+  "DryGrass", # 2
+  "DenseTrees", # 3
+  "Burning", # 4
+  "NormalForest" # 5
 )
+
+
+grid_rows <- 10
+grid_cols <- 10
 
 # Initialize grif function
 initialize_grid <- function(rows, cols) {
   grid <- matrix(nrow = rows, ncol = cols)
-  for (y in 1:rows){
+  for (y in 1:rows) {
     for (x in 1:cols) {
       # Sample from the indexes of the cell_States dictionary
       grid[y, x] <- sample(seq_along(cell_states), 1)
     }
   }
 
-  return (grid)
+  return(grid)
 }
 
-initial_state <- initialize_grid(5,5)
+initial_state <- initialize_grid(grid_rows, grid_cols)
 initial_state_labels <- sapply(initial_state, function(val) cell_states[val])
-
-
 ```
 
+## B. Design the plot_grid function
+Provide pseudocode to visualize the current state
+of the grid using different colors for each type of area (e.g., blue for water, green for NormalForest,
+red for Burning areas, etc.).
+
+<!-- TODO: Add pseudocode -->
+
+```{r}
+plot_grid <- function(forest_grid) {
+  cell_states_colors <- c(
+    "Water" = "#0000FF", # Blue
+    "DryGrass" = "#ADFF2F", # GreenYellow
+    "DenseTrees" = "#006400", # DarkGreen
+    "Burning" = "#FF0000", # Red
+    "NormalForest" = "#008000" # Green
+  )
+
+  # Order the colors to match the cell states
+  colors <- cell_states_colors[cell_states]
+
+  # Print the image of the grid
+  image(forest_grid, col = colors)
+}
+
+plot_grid(initial_state)
+```
