@@ -104,39 +104,108 @@ plot_grid(initial_state)
 Create pseudocode to identify neighboring cells
 of a given point.
 
-<!-- TODO: Add pseudocode -->
+<!-- TODO: Add pseudocode 
+Initially saved only the coordinates,
+now i save state, and coordinates
+-->
 
 ```{R}
-neighbours <- function(forest_grid, point) {
-  x <- point[1]
-  y <- point[2]
+neighbours <- function(forest_grid, cell) {
+  x <- cell[1]
+  y <- cell[2]
 
   max_x <- dim(forest_grid)[1]
   max_y <- dim(forest_grid)[2]
 
 
   result <- list(
-    c(x - 1, y - 1),
-    c(x, y - 1),
-    c(x + 1, y - 1),
-    c(x - 1, y),
-    c(x + 1, y),
-    c(x - 1, y + 1),
-    c(x, y + 1),
-    c(x + 1, y + 1)
+    c(x - 1, y - 1), # Bottom left
+    c(x, y - 1), # Bottom center
+    c(x + 1, y - 1), # Bottom right
+    c(x - 1, y), # Center left
+    c(x + 1, y), # Center right
+    c(x - 1, y + 1), # Top left
+    c(x, y + 1), # Top center
+    c(x + 1, y + 1) # Top right
   )
 
   valid_result <- list()
 
-  for (negh in result){
+  for (negh in result) {
     if (negh[1] > 0 && negh[2] > 0 && negh[1] <= max_x && negh[2] <= max_y) {
-      valid_result <- c(valid_result, list(negh))
+      negh_obj <- c(
+        "state" = forest_grid[negh[1], negh[2]],
+        "coords" = c(
+          "x" = negh[1],
+          "y" = negh[2]
+        )
+      )
+
+      valid_result <- append(valid_result, list(negh_obj))
     }
   }
 
-  return (valid_result)
+  return(valid_result)
 }
 
 
-neighbours(initial_state, c(10, 10))
+test_neghs <- neighbours(initial_state, c(1, 1))
+
+
+test_neghs[[1]]
+test_neghs[[1]]["state"]
+test_neghs[[1]]["coords.x"]
+test_neghs[[1]]["coords.y"]
+```
+
+## D. Construct the propagate function
+Draft pseudocode to manage fire propagation based on:
+- The type of area
+- Its current state
+- Neighboring cell states.
+
+<!-- TODO: Add pseudocode -->
+
+```{R}
+# "Water",          # 1
+# "DryGrass",       # 2
+# "DenseTrees",     # 3
+# "Burning",        # 4
+# "NormalForest"    # 5
+
+propagate <- function(cell, neghs) {
+  if (cell[["state"]] != 4) {
+    print("Not Burning, RETURN")
+    return()
+  }
+
+  neghs_probs <- sapply(neghs, function(neg) {
+    return(
+      switch(
+        neg[["state"]],
+        "1" = 0.0,      # max = 0.0
+        "2" = 0.125,    # max = 1.0
+        "3" = 0.05,     # max = 0.4
+        "4" = 0.0,      # max = 0.0
+        "5" = 0.0875    # max = 0.7
+      ) + 
+    )
+  })
+
+  return(neghs_probs)
+}
+
+coords <- c(1, 1)
+
+cell <- c(
+  "state" = initial_state[coords[1], coords[2]],
+  "coords" = c(
+    "x" = coords[1],
+    "y" = coords[2]
+  )
+)
+
+neghs <- neighbours(initial_state, c(cell[["coords.x"]], cell[["coords.y"]]))
+
+propagate_result <- propagate(cell, neghs)
 ```
