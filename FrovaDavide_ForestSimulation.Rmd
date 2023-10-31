@@ -164,6 +164,7 @@ now i save state, and coordinates
 #    state coords.x coords.y
 #        1        2        2
 
+# forest_grid object
 neighbours <- function(forest_grid, cell) {
   x <- cell[1]
   y <- cell[2]
@@ -173,14 +174,14 @@ neighbours <- function(forest_grid, cell) {
 
 
   result <- list(
-    c(x - 1, y - 1), # Bottom left
-    c(x, y - 1), # Bottom center
-    c(x + 1, y - 1), # Bottom right
+    c(x - 1, y - 1), # Top left
+    c(x, y - 1), # Top center
+    c(x + 1, y - 1), # Top right
     c(x - 1, y), # Center left
     c(x + 1, y), # Center right
-    c(x - 1, y + 1), # Top left
-    c(x, y + 1), # Top center
-    c(x + 1, y + 1) # Top right
+    c(x - 1, y + 1), # Bottom left
+    c(x, y + 1), # Bottom center
+    c(x + 1, y + 1) # Bottom right
   )
 
   valid_result <- list()
@@ -188,7 +189,7 @@ neighbours <- function(forest_grid, cell) {
   for (negh in result) {
     if (negh[1] > 0 && negh[2] > 0 && negh[1] <= max_x && negh[2] <= max_y) {
       negh_obj <- c(
-        "state" = forest_grid$status[negh[1], negh[2]],
+        "state" = forest_grid$status[negh[2], negh[1]],
         "coords" = c(
           "x" = negh[1],
           "y" = negh[2]
@@ -203,7 +204,7 @@ neighbours <- function(forest_grid, cell) {
 }
 
 
-# test_neghs <- neighbours(initial_state, c(1, 1))
+test_neghs <- neighbours(initial_state, c(10, 10))
 
 
 # test_neghs[[1]]
@@ -285,7 +286,7 @@ and grid updates using the neighbours and propagate functions.
 update_grid <- function(forest_grid) {
   for (y in 1:ncol(forest_grid$status)) {
     for (x in 1:nrow(forest_grid$status)) {
-      cell_state <- forest_grid$status[x, y]
+      cell_state <- forest_grid$status[y, x]
       # Get the neighbours of the current cell
       neghs <- neighbours(forest_grid = forest_grid["status"], cell = c(x, y))
 
@@ -299,8 +300,8 @@ update_grid <- function(forest_grid) {
       probs_propagate <- propagate(propagate_cell, neghs)
 
       for (negIndex in 1:length(neghs)) {
-        forest_grid$prob[neghs[[negIndex]][["coords.x"]], neghs[[negIndex]][["coords.y"]]] <-
-          forest_grid$prob[neghs[[negIndex]][["coords.x"]], neghs[[negIndex]][["coords.y"]]] + probs_propagate[[negIndex]]
+        forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] <-
+          forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] + probs_propagate[[negIndex]]
       }
 
 
@@ -320,12 +321,13 @@ next_state <- update_grid(initial_state)
 plot_grid(next_state$status)
 
 plot_probs_and_states(next_state)
+plot_probs_and_states(next_state, FALSE)
 
 # plot_3D(next_state)
 ```
 
 ```{R}
-plot_probs_and_states <- function(forest_grid) {
+plot_probs_and_states <- function(forest_grid, probs = TRUE) {
   flipped_grid <- apply(forest_grid$status, 2, rev)
 
   flipped_probs <- apply(forest_grid$prob, 2, rev)
@@ -346,7 +348,7 @@ plot_probs_and_states <- function(forest_grid) {
   # Add probabilities on top of the rectangles
   for (i in 1:nrow(flipped_probs)) {
     for (j in 1:ncol(flipped_probs)) {
-      text(j, i, labels = flipped_probs[i, j], cex = 1.5)
+      text(j, i, labels = ifelse(probs, flipped_probs[i, j], flipped_grid[i, j]), cex = 1.5)
     }
   }
 }
