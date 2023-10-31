@@ -99,3 +99,44 @@ plot_grid <- function(forest_grid) {
 
 plot_grid(initial_state)
 ```
+
+## C. Develop the neighbours function
+Create pseudocode to identify neighboring cells
+of a given point.
+
+<!-- TODO: Add pseudocode -->
+
+```{R}
+neighbours <- function(forest_grid, point) {
+  x <- point[1]
+  y <- point[2]
+
+  max_x <- dim(forest_grid)[1]
+  max_y <- dim(forest_grid)[2]
+
+
+  result <- list(
+    c(x - 1, y - 1),
+    c(x, y - 1),
+    c(x + 1, y - 1),
+    c(x - 1, y),
+    c(x + 1, y),
+    c(x - 1, y + 1),
+    c(x, y + 1),
+    c(x + 1, y + 1)
+  )
+
+  valid_result <- list()
+
+  for (negh in result){
+    if (negh[1] > 0 && negh[2] > 0 && negh[1] <= max_x && negh[2] <= max_y) {
+      valid_result <- c(valid_result, list(negh))
+    }
+  }
+
+  return (valid_result)
+}
+
+
+neighbours(initial_state, c(10, 10))
+```
