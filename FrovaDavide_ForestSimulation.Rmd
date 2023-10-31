@@ -37,6 +37,13 @@ begins.
 
 <!-- TODO: Add pseudocode -->
 
+```{R}
+# Install and load the rgl package
+if (!require(rgl)) install.packages("rgl")
+library(rgl)
+```
+
+
 ```{r}
 cell_states <- c(
   "Water", # 1
@@ -46,17 +53,32 @@ cell_states <- c(
   "NormalForest" # 5
 )
 
+cell_states_colors <- c(
+  "Water" = "#0000FF", # Blue
+  "DryGrass" = "#ADFF2F", # GreenYellow
+  "DenseTrees" = "#006400", # DarkGreen
+  "Burning" = "#FF0000", # Red
+  "NormalForest" = "#008000" # Green
+)
+
 
 grid_rows <- 10
 grid_cols <- 10
 
 # Initialize grif function
 initialize_grid <- function(rows, cols) {
-  grid <- matrix(nrow = rows, ncol = cols)
+  # Create a list to store the grid
+  grid <- list(
+    "status" = matrix(nrow = rows, ncol = cols),
+    "prob" = matrix(nrow = rows, ncol = cols)
+  )
+
   for (y in 1:rows) {
     for (x in 1:cols) {
-      # Sample from the indexes of the cell_States dictionary
-      grid[y, x] <- sample(seq_along(cell_states), 1)
+      # Sample from the indexes of the cell_states dictionary
+      status <- sample(seq_along(cell_states), 1)
+      grid$status[y, x] <- status
+      grid$prob[y, x] <- 0.0 # Replace with your actual prob calculation
     }
   }
 
@@ -64,7 +86,9 @@ initialize_grid <- function(rows, cols) {
 }
 
 initial_state <- initialize_grid(grid_rows, grid_cols)
-initial_state_labels <- sapply(initial_state, function(val) cell_states[val])
+
+
+# initial_state_labels <- apply(initial_state$status, c(1,2), function(val) cell_states[val])
 ```
 
 ## B. Design the plot_grid function
@@ -76,19 +100,15 @@ red for Burning areas, etc.).
 
 ```{r}
 plot_grid <- function(forest_grid) {
-  cell_states_colors <- c(
-    "Water" = "#0000FF", # Blue
-    "DryGrass" = "#ADFF2F", # GreenYellow
-    "DenseTrees" = "#006400", # DarkGreen
-    "Burning" = "#FF0000", # Red
-    "NormalForest" = "#008000" # Green
-  )
+  # I flip the grid for better visualization and consistency with the print of the values
+  flipped_grid <- apply(forest_grid, 2, rev)
+  transposed_again <- t(flipped_grid)
 
   # Order the colors to match the cell states
   colors <- cell_states_colors[cell_states]
 
   # Print the image of the grid
-  image(forest_grid, col = colors)
+  image(transposed_again, col = colors)
 
   # Add a legend
   # legend("bottom",
@@ -97,7 +117,28 @@ plot_grid <- function(forest_grid) {
   # )
 }
 
-plot_grid(initial_state)
+plot_grid(initial_state$status)
+```
+
+
+```{R}
+plot_3D <- function(forest_grid) {
+  flipped_grid <- apply(forest_grid$status, 2, rev)
+  transposed_status <- t(flipped_grid)
+
+  flipped_probs <- apply(forest_grid$prob, 2, rev)
+  transposed_probs <- t(flipped_probs)
+
+  # Create a 3D plot
+  x <- 1:ncol(transposed_status)
+  y <- 1:nrow(transposed_status)
+  z <- transposed_probs
+  colors <- cell_states_colors[transposed_status]
+  persp3d(x, y, z, col = colors, xlab = "X", ylab = "Y", zlab = "Prob")
+}
+
+plot_3D(initial_state)
+# plot_3D(next_state)
 ```
 
 ## C. Develop the neighbours function
@@ -110,12 +151,25 @@ now i save state, and coordinates
 -->
 
 ```{R}
+# Example output:
+# [[1]]
+#    state coords.x coords.y
+#        3        2        1
+
+# [[2]]
+#    state coords.x coords.y
+#        4        1        2
+
+# [[3]]
+#    state coords.x coords.y
+#        1        2        2
+
 neighbours <- function(forest_grid, cell) {
   x <- cell[1]
   y <- cell[2]
 
-  max_x <- dim(forest_grid)[1]
-  max_y <- dim(forest_grid)[2]
+  max_x <- dim(forest_grid$status)[1]
+  max_y <- dim(forest_grid$status)[2]
 
 
   result <- list(
@@ -134,7 +188,7 @@ neighbours <- function(forest_grid, cell) {
   for (negh in result) {
     if (negh[1] > 0 && negh[2] > 0 && negh[1] <= max_x && negh[2] <= max_y) {
       negh_obj <- c(
-        "state" = forest_grid[negh[1], negh[2]],
+        "state" = forest_grid$status[negh[1], negh[2]],
         "coords" = c(
           "x" = negh[1],
           "y" = negh[2]
@@ -149,13 +203,13 @@ neighbours <- function(forest_grid, cell) {
 }
 
 
-test_neghs <- neighbours(initial_state, c(1, 1))
+# test_neghs <- neighbours(initial_state, c(1, 1))
 
 
-test_neghs[[1]]
-test_neghs[[1]]["state"]
-test_neghs[[1]]["coords.x"]
-test_neghs[[1]]["coords.y"]
+# test_neghs[[1]]
+# test_neghs[[1]]["state"]
+# test_neghs[[1]]["coords.x"]
+# test_neghs[[1]]["coords.y"]
 ```
 
 ## D. Construct the propagate function
@@ -167,45 +221,135 @@ Draft pseudocode to manage fire propagation based on:
 <!-- TODO: Add pseudocode -->
 
 ```{R}
+# Example output:
+# [1] 0.3 0.0 0.0
+
+
+
 # "Water",          # 1
 # "DryGrass",       # 2
 # "DenseTrees",     # 3
 # "Burning",        # 4
 # "NormalForest"    # 5
 
-propagate <- function(cell, neghs) {
+# Cell:
+# cell <- c(
+#   "state" = 1--5,
+#   "coords" = c(
+#     "x" = 1,
+#     "y" = 1
+#   )
+# )
+propagate <- function(cell, neighbours) {
   if (cell[["state"]] != 4) {
-    print("Not Burning, RETURN")
-    return()
+    return(sapply(neighbours, function(val) 0.0))
   }
 
-  neghs_probs <- sapply(neghs, function(neg) {
+  neghs_probs <- sapply(neighbours, function(neg) {
     return(
-      switch(
-        neg[["state"]],
-        "1" = 0.0,      # max = 0.0
-        "2" = 0.125,    # max = 1.0
-        "3" = 0.05,     # max = 0.4
-        "4" = 0.0,      # max = 0.0
-        "5" = 0.0875    # max = 0.7
-      ) + 
+      switch(neg[["state"]],
+        "1" = 0.0, # max = 0.0
+        "2" = 0.125, # max = 1.0
+        "3" = 0.05, # max = 0.4
+        "4" = 0.0, # max = 0.0
+        "5" = 0.0875 # max = 0.7
+      )
     )
   })
 
   return(neghs_probs)
 }
 
-coords <- c(1, 1)
+# coords <- c(1, 1)
 
-cell <- c(
-  "state" = initial_state[coords[1], coords[2]],
-  "coords" = c(
-    "x" = coords[1],
-    "y" = coords[2]
+# cell <- c(
+#   "state" = initial_state[coords[1], coords[2]],
+#   "coords" = c(
+#     "x" = coords[1],
+#     "y" = coords[2]
+#   )
+# )
+
+# neghs <- neighbours(initial_state, c(cell[["coords.x"]], cell[["coords.y"]]))
+
+# propagate_result <- propagate(cell, neghs)
+```
+
+## E. Design the update_grid function:
+Develop pseudocode to manage fire dynamics
+and grid updates using the neighbours and propagate functions.
+
+<!-- TODO: Add pseudocode -->
+
+```{R}
+update_grid <- function(forest_grid) {
+  for (y in 1:ncol(forest_grid$status)) {
+    for (x in 1:nrow(forest_grid$status)) {
+      cell_state <- forest_grid$status[x, y]
+      # Get the neighbours of the current cell
+      neghs <- neighbours(forest_grid = forest_grid["status"], cell = c(x, y))
+
+      propagate_cell <- c(
+        "state" = cell_state,
+        "coords" = c(
+          "x" = x,
+          "y" = y
+        )
+      )
+      probs_propagate <- propagate(propagate_cell, neghs)
+
+      for (negIndex in 1:length(neghs)) {
+        forest_grid$prob[neghs[[negIndex]][["coords.x"]], neghs[[negIndex]][["coords.y"]]] <-
+          forest_grid$prob[neghs[[negIndex]][["coords.x"]], neghs[[negIndex]][["coords.y"]]] + probs_propagate[[negIndex]]
+      }
+
+
+    }
+  }
+
+  return(forest_grid)
+}
+
+
+# Probabilities matrix with initial starting values
+
+next_state <- update_grid(initial_state)
+
+# next_state <- update_grid(next_state)
+
+plot_grid(next_state$status)
+
+plot_probs_and_states(next_state)
+
+# plot_3D(next_state)
+```
+
+```{R}
+plot_probs_and_states <- function(forest_grid) {
+  flipped_grid <- apply(forest_grid$status, 2, rev)
+
+  flipped_probs <- apply(forest_grid$prob, 2, rev)
+
+  # Create a blank plot
+  plot(1, 1,
+    xlim = c(1, ncol(flipped_grid)), ylim = c(1, nrow(flipped_grid)),
+    type = "n", xlab = "", ylab = "", xaxt = "n", yaxt = "n"
   )
-)
 
-neghs <- neighbours(initial_state, c(cell[["coords.x"]], cell[["coords.y"]]))
+  # Draw rectangles for each cell
+  for (i in 1:nrow(flipped_grid)) {
+    for (j in 1:ncol(flipped_grid)) {
+      rect(j - 0.5, i - 0.5, j + 0.5, i + 0.5, col = cell_states_colors[flipped_grid[i, j]])
+    }
+  }
 
-propagate_result <- propagate(cell, neghs)
+  # Add probabilities on top of the rectangles
+  for (i in 1:nrow(flipped_probs)) {
+    for (j in 1:ncol(flipped_probs)) {
+      text(j, i, labels = flipped_probs[i, j], cex = 1.5)
+    }
+  }
+}
+
+# plot_probs_and_states(next_state)
 ```
