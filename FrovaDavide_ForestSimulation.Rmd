@@ -89,6 +89,12 @@ plot_grid <- function(forest_grid) {
 
   # Print the image of the grid
   image(forest_grid, col = colors)
+
+  # Add a legend
+  # legend("bottom",
+  #   legend = names(cell_states_colors),
+  #   fill = cell_states_colors, cex = 1, horiz = TRUE
+  # )
 }
 
 plot_grid(initial_state)
