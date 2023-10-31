@@ -1,0 +1,64 @@
+---
+title: "Assignment 1 - Forest Fire Simulation - Probability and Statistics 2023"
+author: "Frova Davide"
+output:
+  html_notebook: default
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+# Notes
+- Grid
+- Each cell represents a portion of the forest:
+  - Unburned
+  - Burning
+  - Burned
+- If adjacent to a burning and unburned: Can ignite with prob `p`
+- If unburned can ignite spontaneously with small prob `p_start`
+- Bayes:
+  - Likelihood of igniting by neighbor = P (Si(t + 1) = burning|Si_neighbors (t) = burning) = p
+  - Lieklihood of igniting spontaneous = P (Si(t + 1) = burning) = p_start
+- A burning cell transitions into a burned cell in the next time step.
+- Burned and unburned cells retain their states unless altered by the above conditions.
+
+
+# Design the pseudocode for the forest fire model:
+## A. Design the initialize_grid function
+
+Develop pseudocode for the initialize grid
+function that outputs a m × n grid, where each point represents a portion of the forest. Your map
+should include at least one water body (Water), a few patches of dry grass (DryGrass), areas with
+dense trees (DenseTrees), and a few initially burning areas (Burning). Label the rest of the areas
+as NormalForest. This grid will represent the initial state of the forest before the fire simulation
+begins.
+
+```{r}
+cell_states <- c(
+  "Water",        #1
+  "DryGrass",     #2
+  "DenseTrees",   #3
+  "Burning",      #4
+  "NormalForest"  #5
+)
+
+# Initialize grif function
+initialize_grid <- function(rows, cols) {
+  grid <- matrix(nrow = rows, ncol = cols)
+  for (y in 1:rows){
+    for (x in 1:cols) {
+      # Sample from the indexes of the cell_States dictionary
+      grid[y, x] <- sample(seq_along(cell_states), 1)
+    }
+  }
+
+  return (grid)
+}
+
+initial_state <- initialize_grid(5,5)
+initial_state_labels <- sapply(initial_state, function(val) cell_states[val])
+
+
+```
+
