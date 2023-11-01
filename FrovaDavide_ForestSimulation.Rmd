@@ -2,11 +2,11 @@
 title: "Assignment 1 - Forest Fire Simulation - Probability and Statistics 2023"
 author: "Frova Davide"
 output:
-  html_notebook: default
-  word_document: default
-  pdf_document: default
   html_document:
     df_print: paged
+  word_document: default
+  html_notebook: default
+  pdf_document: default
 ---
 
 # Notes
@@ -51,7 +51,7 @@ cell_states <- c(
   "DenseTrees", # 3
   "Burning", # 4
   "NormalForest", # 5
-  "Burned"  #6
+  "Burned" # 6
 )
 
 cell_states_colors <- c(
@@ -78,7 +78,7 @@ initialize_grid <- function(rows, cols) {
   for (y in 1:rows) {
     for (x in 1:cols) {
       # Sample from the indexes of the cell_states dictionary (without the burned state)
-      status <- sample(seq_along(cell_states):5, 1)
+      status <- sample(seq_along(head(cell_states, -1)), 1)
       grid$status[y, x] <- status
       grid$prob[y, x] <- 0.0 # Replace with your actual prob calculation
     }
@@ -87,8 +87,7 @@ initialize_grid <- function(rows, cols) {
   return(grid)
 }
 
-initial_state <- initialize_grid(grid_rows, grid_cols)
-
+# initial_state <- initialize_grid(grid_rows, grid_cols)
 
 # initial_state_labels <- apply(initial_state$status, c(1,2), function(val) cell_states[val])
 ```
@@ -107,7 +106,7 @@ plot_grid <- function(forest_grid) {
   transposed_again <- t(flipped_grid)
 
   # Get unique values to only take the colors needed (image will be angry otherwise)
-  colors <- sort(unique(as.vector(initial_state$status)))
+  colors <- sort(unique(as.vector(forest_grid)))
   # Order the colors to match the cell states
   colors <- sapply(colors, function(val) cell_states_colors[val])
 
@@ -353,7 +352,6 @@ update_grid <- function(forest_grid) {
         forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] <-
           forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] + probs_propagate[[negIndex]]
       }
-
     }
   }
 
@@ -363,13 +361,12 @@ update_grid <- function(forest_grid) {
 
 # Probabilities matrix with initial starting values
 
-next_state <- update_grid(initial_state)
-
-next_state <- update_grid(next_state)
+# next_state <- update_grid(initial_state)
+# next_state <- update_grid(next_state)
+# plot_probs_and_states(next_state)
 
 # plot_grid(next_state$status)
 
-plot_probs_and_states(next_state)
 # plot_probs_and_states(next_state, FALSE)
 
 # plot_3D(next_state)
@@ -403,4 +400,39 @@ plot_probs_and_states <- function(forest_grid, probs = TRUE) {
 }
 
 # plot_probs_and_states(next_state)
+```
+
+```{R}
+simulate <- function() {
+  # N simulations, until t_max iterations
+  t_max <- 10
+  N <- 5
+  grid_rows <- 20
+  grid_cols <- 20
+
+  for (i in 1:N) {
+    paste("Simulation", i)
+    # Initialize the grid
+    forest_grid <- initialize_grid(grid_rows, grid_cols)
+
+    # Plot the initial state
+    plot_grid(forest_grid[["status"]])
+
+    # Iterate over the t_max iterations
+    for (t in 1:t_max) {
+      # Print the current iteration
+      paste("Iteration", t)
+      # Update the grid
+      forest_grid <- update_grid(forest_grid)
+
+      # Plot the grid
+      plot_grid(forest_grid[["status"]])
+
+      # Wait 1 second
+      Sys.sleep(1)
+    }
+  }
+}
+
+simulate()
 ```
