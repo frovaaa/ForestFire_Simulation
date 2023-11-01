@@ -90,7 +90,7 @@ initialize_grid <- function(rows, cols) {
   return(grid)
 }
 
-# initial_state <- initialize_grid(grid_rows, grid_cols)
+# initial_state <- initialize_grid(5, 5)
 
 # initial_state_labels <- apply(initial_state$status, c(1,2), function(val) cell_states[val])
 ```
@@ -416,8 +416,8 @@ simulate <- function() {
   # N simulations, until t_max iterations
   t_max <- 5
   N <- 1
-  grid_rows <- 200
-  grid_cols <- 200
+  grid_rows <- 100
+  grid_cols <- 100
 
   for (i in 1:N) {
     paste("Simulation", i)
@@ -425,7 +425,7 @@ simulate <- function() {
     forest_grid <- initialize_grid(grid_rows, grid_cols)
 
     # Plot the initial state
-    plot_grid(forest_grid[["status"]])
+    # plot_grid(forest_grid[["status"]])
 
     # Iterate over the t_max iterations
     # for (t in 1:t_max) {
