@@ -41,6 +41,9 @@ begins.
 # Install and load the rgl package
 if (!require(rgl)) install.packages("rgl")
 library(rgl)
+# Install and load the animation package
+if (!require(animation)) install.packages("animation")
+library(animation)
 ```
 
 
@@ -60,12 +63,12 @@ cell_states_colors <- c(
   "#006400", # DarkGreen / DenseTrees
   "#FF0000", # Red / Burning
   "#008000", # Green / NormalForest
-  "#A9A9A9" # DarkGray / Burned
+  "#201F1F" # DarkGray / Burned
 )
 
 
-grid_rows <- 10
-grid_cols <- 10
+# grid_rows <- 10
+# grid_cols <- 10
 
 # Initialize grif function
 initialize_grid <- function(rows, cols) {
@@ -402,13 +405,19 @@ plot_probs_and_states <- function(forest_grid, probs = TRUE) {
 # plot_probs_and_states(next_state)
 ```
 
+## F. Draft the simulate function
+Provide pseudocode to orchestrate the entire simu-
+lation over multiple iterations using the previously developed functions.
+
+<!-- TODO: Write pseudocode -->
+
 ```{R}
 simulate <- function() {
   # N simulations, until t_max iterations
-  t_max <- 10
-  N <- 5
-  grid_rows <- 20
-  grid_cols <- 20
+  t_max <- 5
+  N <- 1
+  grid_rows <- 200
+  grid_cols <- 200
 
   for (i in 1:N) {
     paste("Simulation", i)
@@ -419,18 +428,35 @@ simulate <- function() {
     plot_grid(forest_grid[["status"]])
 
     # Iterate over the t_max iterations
-    for (t in 1:t_max) {
-      # Print the current iteration
-      paste("Iteration", t)
-      # Update the grid
-      forest_grid <- update_grid(forest_grid)
+    # for (t in 1:t_max) {
+    #   # Print the current iteration
+    #   paste("Iteration", t)
+    #   # Update the grid
+    #   forest_grid <- update_grid(forest_grid)
 
-      # Plot the grid
-      plot_grid(forest_grid[["status"]])
+    #   # Plot the grid
+    #   plot_grid(forest_grid[["status"]])
 
-      # Wait 1 second
-      Sys.sleep(1)
+    #   # Wait 1 second
+    #   Sys.sleep(1)
+    # }
+
+    # Define the animation function
+    ani.fun <- function() {
+      for (t in 1:t_max) {
+        # Print the current iteration
+        # paste("Iteration", t)
+        # Update the grid
+        forest_grid <- update_grid(forest_grid)
+
+        # Plot the grid
+        plot_grid(forest_grid[["status"]])
+      }
     }
+
+
+    # Save the animation as a GIF
+    saveGIF(ani.fun(), movie.name = "forest_simulation.gif", interval = 1)
   }
 }
 
