@@ -152,19 +152,19 @@ sin_pos <- function(y, x, max_y, thickness) {
 
 # Wrapper function for the func_fill
 # It will produce a exp_wave function, river like
-exp_pos <- function(y, x, max_y, thickness) {
-  return(
-    func_fill(
-      y = y,
-      x = x,
-      min_y = max_y * 2,
-      max_y = max_y,
-      max_x = pi * 20,
-      func = exp,
-      thickness = thickness # 0.3
-    )
-  )
-}
+# exp_pos <- function(y, x, max_y, thickness) {
+#   return(
+#     func_fill(
+#       y = y,
+#       x = x,
+#       min_y = max_y * 2,
+#       max_y = max_y,
+#       max_x = pi * 20,
+#       func = exp,
+#       thickness = thickness # 0.3
+#     )
+#   )
+# }
 
 rand_pos <- function(y, x, max_y, thickness) {
   return(
@@ -180,24 +180,45 @@ rand_pos <- function(y, x, max_y, thickness) {
   )
 }
 
-initial_state <- initialize_grid(100, 100)
 
-initial_state <- fill_grid(initial_state, sin_pos, function(y, x) 0.0, 1, 0.4)
+# initial_state <- fill_grid(initial_state, sin_pos, function(y, x) 0.0, 1, 0.4)
 
+# initial_state <- fill_grid(
+#   forest_grid = initial_state,
+#   pos_func = exp_pos,
+#   prob_func = function(y, x) 0.0, # Starting Probability (self-ignition prob) | 0.002
+#   cell_type = 1,
+#   thickness = 0.2
+# )
 
-initial_state <- fill_grid(
-  forest_grid = initial_state,
-  pos_func = rand_pos,
-  prob_func = function(y, x) 0.0, # Starting Probability (self-ignition prob) | 0.002
-  cell_type = 2,
-  thickness = 20
-)
+# initial_state <- fill_grid(
+#   forest_grid = initial_state,
+#   pos_func = rand_pos,
+#   prob_func = function(y, x) 0.00002, # Starting Probability (self-ignition prob) | 0.002
+#   cell_type = 2,
+#   thickness = 20
+# )
 
-plot_grid(initial_state)
+# rand_max_x <- pi * sample(10:50, 1)
+# rand_min_y <- sample(2:20, 1)
 
+# exp_pos <- function(y, x, max_y, thickness) {
+#   return(
+#     func_fill(
+#       y = y,
+#       x = x,
+#       min_y = max_y * rand_min_y,
+#       max_y = max_y,
+#       max_x = rand_max_x,
+#       func = exp,
+#       thickness = thickness # 0.3
+#     )
+#   )
+# }
 
+# initial_state <- fill_grid(initial_state, exp_pos, function(y, x) 0.0, 1, runif(1, 0, 0.5))
 
-# initial_state_labels <- apply(initial_state$status, c(1,2), function(val) cell_states[val])
+# plot_grid(initial_state)
 ```
 
 ## B. Design the plot_grid function
@@ -210,31 +231,35 @@ red for Burning areas, etc.).
 ```{r}
 plot_grid <- function(forest_grid) {
   forest_grid <- forest_grid$status
-  flipped_grid <- apply(forest_grid, 2, rev)
 
   # Get the number of rows and columns
-  nrow <- dim(flipped_grid)[1]
-  ncol <- dim(flipped_grid)[2]
+  # nrow <- dim(forest_grid)[1]
+  # ncol <- dim(forest_grid)[2]
+
+  # Increase the size of the color matrix
+  enlarged_forest_grid <- kronecker(forest_grid, matrix(1, nrow = 10, ncol = 10))
+
+  # Get the number of rows and columns of the enlarged matrix
+  nrow_enlarged <- dim(enlarged_forest_grid)[1]
+  ncol_enlarged <- dim(enlarged_forest_grid)[2]
 
   # Create an empty plot
   plot(
     0, 0,
     type = "n",
-    xlim = c(0, ncol),
-    ylim = c(0, nrow),
+    xlim = c(0, ncol_enlarged),
+    ylim = c(0, nrow_enlarged),
     xlab = "", ylab = "", xaxt = "n", yaxt = "n"
   )
 
-  # Draw a rectangle for each cell
-  for (i in 1:nrow) {
-    for (j in 1:ncol) {
-      # Get the color for the current cell
-      cell_color <- cell_states_colors[flipped_grid[i, j]]
+  # Create a color matrix
+  color_matrix <- matrix(cell_states_colors[enlarged_forest_grid], nrow = nrow_enlarged, ncol = ncol_enlarged, byrow = TRUE)
 
-      # Draw the rectangle
-      rect(j - 1, i - 1, j, i, col = cell_color, border = NA)
-    }
-  }
+  # Convert the color matrix to an image
+  img <- as.raster(color_matrix)
+
+  # Draw the image
+  rasterImage(img, 0, 0, ncol_enlarged, nrow_enlarged)
 }
 
 # plot_grid(initial_state)
@@ -502,7 +527,7 @@ plot_probs_and_states <- function(forest_grid, probs = TRUE) {
   }
 }
 
-plot_probs_and_states(initial_state)
+# plot_probs_and_states(initial_state)
 ```
 
 ## F. Draft the simulate function
@@ -512,34 +537,51 @@ lation over multiple iterations using the previously developed functions.
 <!-- TODO: Write pseudocode -->
 
 ```{R}
+rand_max_x <- pi * sample(10:50, 1)
+rand_min_y <- sample(2:20, 1)
+
 simulate <- function() {
   # N simulations, until t_max iterations
   t_max <- 100
   N <- 1
-  grid_rows <- 10
-  grid_cols <- 10
+  grid_rows <- 100
+  grid_cols <- 100
 
   for (i in 1:N) {
     paste("Simulation", i)
-    # Initialize the grid
+
+    # Initialize the grid full of normal forest
     forest_grid <- initialize_grid(grid_rows, grid_cols)
 
-    # Plot the initial state
-    # plot_grid(forest_grid[["status"]])
+    # CUSTOMIZABLE PART -------------------------
 
-    # Iterate over the t_max iterations
-    # for (t in 1:t_max) {
-    #   # Print the current iteration
-    #   paste("Iteration", t)
-    #   # Update the grid
-    #   forest_grid <- update_grid(forest_grid)
+    # Add random dry grass with some small self ignition probability
+    forest_grid <- fill_grid(
+      forest_grid = forest_grid,
+      pos_func = rand_pos,
+      prob_func = function(y, x) 0.0002, # Starting Probability (self-ignition prob)
+      cell_type = 2, # Dry grass
+      thickness = runif(1, 0, 20) # Higher value = Higher population
+    )
 
-    #   # Plot the grid
-    #   plot_grid(forest_grid[["status"]])
+    # Add random dense trees with some small self ignition probability
+    forest_grid <- fill_grid(
+      forest_grid = forest_grid,
+      pos_func = rand_pos,
+      prob_func = function(y, x) 0.00002, # Starting Probability (self-ignition prob)
+      cell_type = 3, # Dense trees
+      thickness = runif(1, 0, 20) # Higher value = Higher population
+    )
 
-    #   # Wait 1 second
-    #   Sys.sleep(1)
-    # }
+    #  Randomize the values of the exp_pos function
+    rand_max_x <- pi * sample(10:50, 1)
+    rand_min_y <- sample(2:20, 1)
+
+    # Adding a river with a random exp function plotting
+    forest_grid <- fill_grid(forest_grid, exp_pos, function(y, x) 0.0, 1, runif(1, 0, 0.3))
+
+    # Random starting point burning
+    forest_grid$status[sample(1:grid_rows, 1), sample(1:grid_cols, 1)] <- 4
 
     # Define the animation function
     ani.fun <- function() {
@@ -551,19 +593,16 @@ simulate <- function() {
 
         # Plot the grid
         plot_grid(forest_grid)
+        print(paste("T: ", t, " / ", t_max))
       }
+      print(paste(i, "| Simulation Completed"))
     }
 
 
     # Save the animation as a GIF
-    saveGIF(ani.fun(), movie.name = "forest_simulation.gif", interval = 0.2)
+    saveGIF(ani.fun(), movie.name = paste("forest_simulation.gif"), interval = 0.2)
   }
 }
 
-# initial_state$status[1, 1] <- 4
-
-forest_grid <- initial_state
-
-plot_grid(forest_grid)
-# simulate()
+simulate()
 ```
