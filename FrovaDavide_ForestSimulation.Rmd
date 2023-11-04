@@ -82,7 +82,7 @@ initialize_grid <- function(rows, cols) {
     for (x in 1:cols) {
       # Sample from the indexes of the cell_states dictionary (without the burned state)
       # status <- sample(seq_along(head(cell_states, -1)), 1)
-      status <- 2
+      status <- 5
       grid$status[y, x] <- status
       grid$prob[y, x] <- 0.0
     }
@@ -93,14 +93,18 @@ initialize_grid <- function(rows, cols) {
 
 # Parametric function that enables the user to fill the forest with a specific function "shape"
 # and a specific probability function, with a desired cell_type
-fill_grid <- function(forest_grid, pos_func, prob_func, cell_type) {
+fill_grid <- function(forest_grid, pos_func, prob_func, cell_type, thickness = 0.5) {
   max_y <- dim(forest_grid$status)[1]
   max_x <- dim(forest_grid$status)[2]
 
   for (y in 1:max_y) {
     for (x in 1:max_x) {
-      if (pos_func(y, x, max_y)) {
-        forest_grid$status[y, x] <- cell_type
+      if (pos_func(y, x, max_y, thickness)) {
+        forest_grid$status[y, x] <- ifelse(
+          cell_type == -1,
+          forest_grid$status[y, x],
+          cell_type
+        )
         forest_grid$prob[y, x] <- prob_func(x, y)
       }
     }
@@ -132,7 +136,7 @@ func_fill <- function(y, x, min_y, max_y, max_x, func, thickness) {
 
 # Wrapper function for the func_fill
 # It will produce a sin_wave function (wavy river like)
-sin_pos <- function(y, x, max_y) {
+sin_pos <- function(y, x, max_y, thickness) {
   return(
     func_fill(
       y = y,
@@ -141,14 +145,14 @@ sin_pos <- function(y, x, max_y) {
       max_y = max_y,
       max_x = pi / 10,
       func = sin,
-      thickness = 0.3
+      thickness = thickness # 0.3
     )
   )
 }
 
 # Wrapper function for the func_fill
 # It will produce a exp_wave function, river like
-exp_pos <- function(y, x, max_y) {
+exp_pos <- function(y, x, max_y, thickness) {
   return(
     func_fill(
       y = y,
@@ -157,12 +161,12 @@ exp_pos <- function(y, x, max_y) {
       max_y = max_y,
       max_x = pi * 20,
       func = exp,
-      thickness = 0.3
+      thickness = thickness # 0.3
     )
   )
 }
 
-rand_pos <- function(y, x, max_y) {
+rand_pos <- function(y, x, max_y, thickness) {
   return(
     func_fill(
       y = y,
@@ -171,14 +175,23 @@ rand_pos <- function(y, x, max_y) {
       max_y = max_y,
       max_x = pi,
       func = function(val) runif(1, -max_y, max_y),
-      thickness = 1
+      thickness = thickness # 0.2
     )
   )
 }
 
 initial_state <- initialize_grid(100, 100)
 
-initial_state <- fill_grid(initial_state, exp_pos, function(y, x) 0.1, 1)
+initial_state <- fill_grid(initial_state, sin_pos, function(y, x) 0.0, 1, 0.4)
+
+
+initial_state <- fill_grid(
+  forest_grid = initial_state,
+  pos_func = rand_pos,
+  prob_func = function(y, x) 0.0, # Starting Probability (self-ignition prob) | 0.002
+  cell_type = 2,
+  thickness = 20
+)
 
 plot_grid(initial_state)
 
@@ -197,23 +210,31 @@ red for Burning areas, etc.).
 ```{r}
 plot_grid <- function(forest_grid) {
   forest_grid <- forest_grid$status
-  # I flip the grid for better visualization and consistency with the print of the values
   flipped_grid <- apply(forest_grid, 2, rev)
-  transposed_again <- t(flipped_grid)
 
-  # Get unique values to only take the colors needed (image will be angry otherwise)
-  colors <- sort(unique(as.vector(forest_grid)))
-  # Order the colors to match the cell states
-  colors <- sapply(colors, function(val) cell_states_colors[val])
+  # Get the number of rows and columns
+  nrow <- dim(flipped_grid)[1]
+  ncol <- dim(flipped_grid)[2]
 
-  # Print the image of the grid
-  image(transposed_again, col = colors)
+  # Create an empty plot
+  plot(
+    0, 0,
+    type = "n",
+    xlim = c(0, ncol),
+    ylim = c(0, nrow),
+    xlab = "", ylab = "", xaxt = "n", yaxt = "n"
+  )
 
-  # Add a legend
-  # legend("bottom",
-  #   legend = names(cell_states_colors),
-  #   fill = cell_states_colors, cex = 1, horiz = TRUE
-  # )
+  # Draw a rectangle for each cell
+  for (i in 1:nrow) {
+    for (j in 1:ncol) {
+      # Get the color for the current cell
+      cell_color <- cell_states_colors[flipped_grid[i, j]]
+
+      # Draw the rectangle
+      rect(j - 1, i - 1, j, i, col = cell_color, border = NA)
+    }
+  }
 }
 
 # plot_grid(initial_state)
@@ -360,20 +381,6 @@ propagate <- function(cell, neighbours) {
 
   return(neghs_probs)
 }
-
-# coords <- c(1, 1)
-
-# cell <- c(
-#   "state" = initial_state[coords[1], coords[2]],
-#   "coords" = c(
-#     "x" = coords[1],
-#     "y" = coords[2]
-#   )
-# )
-
-# neghs <- neighbours(initial_state, c(cell[["coords.x"]], cell[["coords.y"]]))
-
-# propagate_result <- propagate(cell, neghs)
 ```
 
 ## E. Design the update_grid function:
@@ -443,7 +450,7 @@ update_grid <- function(forest_grid) {
 
       # Foraech of the neighbours for which we have the probs. of ignition
       # we sum it to the current prob. values of the forest_grid
-      # (Markov Chain) t_n = t_n-1 + something
+      # (Markov Chain) t_n = t_n-1 + added_prob
       for (negIndex in 1:length(neghs)) {
         forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] <-
           forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] + probs_propagate[[negIndex]]
@@ -495,7 +502,7 @@ plot_probs_and_states <- function(forest_grid, probs = TRUE) {
   }
 }
 
-# plot_probs_and_states(next_state)
+plot_probs_and_states(initial_state)
 ```
 
 ## F. Draft the simulate function
@@ -507,7 +514,7 @@ lation over multiple iterations using the previously developed functions.
 ```{R}
 simulate <- function() {
   # N simulations, until t_max iterations
-  t_max <- 5
+  t_max <- 100
   N <- 1
   grid_rows <- 10
   grid_cols <- 10
@@ -549,9 +556,14 @@ simulate <- function() {
 
 
     # Save the animation as a GIF
-    saveGIF(ani.fun(), movie.name = "forest_simulation.gif", interval = 1)
+    saveGIF(ani.fun(), movie.name = "forest_simulation.gif", interval = 0.2)
   }
 }
 
+# initial_state$status[1, 1] <- 4
+
+forest_grid <- initial_state
+
+plot_grid(forest_grid)
 # simulate()
 ```
