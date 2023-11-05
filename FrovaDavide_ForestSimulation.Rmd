@@ -153,6 +153,7 @@ random_fill is a function with parameters (forest_grid)
   foreach cell in forest_grid
     new_status is a random pick from cell_states
     set the cell "status" field to new_status
+  return forest_grid
 ```
 
 R code:
@@ -182,7 +183,7 @@ filled_forest
 
 We will further develop more advanced ways of filling the grid, but for now this is enough to continue with the definition of other core functionalities.
 
-## Design of the plot_grid function
+## Design of the plot grid function
 
 Now that we have a way of randomly generate the forest grid, we can think of a way to visualize it.
 
@@ -442,32 +443,41 @@ filled_forest$status
 neighbours(filled_forest, c(1, 1))
 ```
 
-## D. Construct the propagate function
+## Construct the propagate function
+Now it's time to define the probabilities of the forest grid cells to ignite eachother.
 
-Draft pseudocode to manage fire propagation based on: - The type of area - Its current state - Neighboring cell states.
+We are interested in getting the contribution probability of a specific cell to ingite each of its neighbours.
 
-<!-- TODO: Add pseudocode -->
+This probability is based on the following aspects:
 
+* Its current state
+* Neighboring cell states
+
+Pseudocode
+```
+propagate is a function with parameters (current_cell, neighbours)
+  if current_cell is not Burning
+    return 0.0 foreach of the neighbours
+  else
+    foreach of the neighbours as neg
+      if neg is Water set prob to 0
+      if neg is DryGrass set prob to 0.125
+      if neg is DenseTrees set prob to 0.05
+      if neg is Burning set prob to 0
+      if neg is NormalForest set prob to 0.0875
+      if neg is Burned set prob to 0
+    return neighoubrs probabilities
+```
+
+R code
 ```{R}
-# Example output:
-# [1] 0.3 0.0 0.0
+# Cell Structure to be given
+# neighbour:
+#   "state" : val
+#   "coords :
+#     "x" : val
+#     "y" : val
 
-
-
-# "Water",          # 1
-# "DryGrass",       # 2
-# "DenseTrees",     # 3
-# "Burning",        # 4
-# "NormalForest"    # 5
-
-# Cell:
-# cell <- c(
-#   "state" = 1--5,
-#   "coords" = c(
-#     "x" = 1,
-#     "y" = 1
-#   )
-# )
 propagate <- function(cell, neighbours) {
   if (cell[["state"]] != 4) {
     return(sapply(neighbours, function(val) 0.0))
@@ -476,34 +486,92 @@ propagate <- function(cell, neighbours) {
   neghs_probs <- sapply(neighbours, function(neg) {
     return(
       switch(neg[["state"]],
-        "1" = 0.0, # max = 0.0
-        "2" = 0.125, # max = 1.0
-        "3" = 0.05, # max = 0.4
-        "4" = 0.0, # max = 0.0
-        "5" = 0.0875, # max = 0.7
-        "6" = 0.0 # max = 0.0
+        "1" = 0.0,    # max = 0.0 | Water
+        "2" = 0.125,  # max = 1.0 | DryGrass
+        "3" = 0.05,   # max = 0.4 | DenseTrees
+        "4" = 0.0,    # max = 0.0 | Burning
+        "5" = 0.0875, # max = 0.7 | NormalForest
+        "6" = 0.0     # max = 0.0 | Burned
       )
     )
   })
-
   return(neghs_probs)
 }
 ```
 
-## E. Design the update_grid function:
+Test of the function
+```{r}
+initial_forest <- initialize_grid(3, 3)
+filled_forest <- random_fill(initial_forest)
+filled_forest$status[1, 1] <- 4
+filled_forest$status[1, 2] <- 2
+filled_forest$status[2, 2] <- 1
+filled_forest$status[2, 1] <- 3
 
-Develop pseudocode to manage fire dynamics and grid updates using the neighbours and propagate functions.
+neghs <- neighbours(filled_forest, c(1, 1))
 
-<!-- TODO: Add pseudocode -->
+current_cell <- c(
+  "state" = filled_forest$status[1, 1],
+  "coords" = c(
+    "x" = 1,
+    "y" = 1
+  )
+)
 
+plot_grid(filled_forest)
+propagate(current_cell, neghs)
+```
+
+### The role of different types of vegetation
+
+The probabilities of transfering the fire are based on a maximum value based on the type of the cell receiving the fire.
+
+This is done in a way that if a cell is surrounded by fire cells its probability of ignition will add up to:
+
+* 0.0 if it is Water
+* 1.0 if it is DryGrass
+* 0.4 if it is DenseTrees
+* 0.0 if it is Burning
+* 0.7 if it is NormalForest
+* 0.0 if it is Burned
+
+So, for example, if a cell of DryGrass is surrouned by Burning cells, it will for sure ignite in the next time step.
+
+## Design of the update grid function:
+
+We have now the tools to design the function that will handle the various updates to be performed on the forest grid.
+
+The updates and checks to be applied to each cell are:
+
+* Check if the cell is going to the Burning state
+* Check if the cell is going to the Burned state
+* Compute the new probability of the cell to become Burning
+* Increase the probability of the cell to become Burned
+
+Pseudocode
+```
+update grid is a function with parameters (forest_grid)
+  foreach of the cells in forest grid as cell
+    if the cell is DryGrass, DenseTrees or NormalForest
+      generate random value between 0.0 and 1.0
+      if the value is less or equal to probability of cell
+        set cell to Burning
+        reset cell probability to 0
+    else if cell is Burning
+      generate random value between 0.0 and 1.0
+      if the value is less or equal to probability of cell
+        set cell to Burned
+        reset cell probability to 0
+      else
+        increase probability of cell
+    compute probability list of neighbours (propagate)
+    foreach neighbour
+      add the new computed probability
+  return forest_grid
+```
+
+R code
 ```{R}
-# "Water",          # 1
-# "DryGrass",       # 2
-# "DenseTrees",     # 3
-# "Burning",        # 4
-# "NormalForest"    # 5
-# "Burned"          # 6
-
 update_grid <- function(forest_grid) {
   for (y in 1:nrow(forest_grid$status)) {
     for (x in 1:ncol(forest_grid$status)) {
@@ -511,8 +579,9 @@ update_grid <- function(forest_grid) {
       cell_state <- forest_grid$status[y, x]
       cell_prob <- forest_grid$prob[y, x]
 
-      # If the cell could burn, generate a random number and check with its probability
-      # if so, set them to burning and reset their prob
+      # If the cell could burn, generate a random number 
+      # and check with its probability
+      # if <= , set them to burning and reset their prob
       if (cell_state == 2 || cell_state == 3 || cell_state == 5) {
         rand_value <- runif(1)
         if (rand_value <= cell_prob) {
@@ -524,7 +593,8 @@ update_grid <- function(forest_grid) {
         }
       } else if (cell_state == 4) {
         # If the cell is burning, and the random value gets the prob
-        # set it to burned and reset its prob, otherwise increase the prob of going out
+        # set it to burned and reset its prob
+        # otherwise increase the prob of going out
 
         rand_value <- runif(1)
         if (rand_value <= cell_prob) {
@@ -536,12 +606,15 @@ update_grid <- function(forest_grid) {
         } else {
           # Increase the probability of going out
           forest_grid$prob[y, x] <- forest_grid$prob[y, x] + 0.3
-          cell_prob <- cell_prob + 0.1
+          cell_prob <- cell_prob + 0.3
         }
       }
 
       # Get the neighbours of the current cell
-      neghs <- neighbours(forest_grid = forest_grid["status"], cell = c(y, x))
+      neghs <- neighbours(
+        forest_grid = forest_grid["status"], 
+        cell = c(y, x)
+      )
 
       # Create an "object" with the data needed from the propagate function
       propagate_cell <- c(
@@ -555,54 +628,71 @@ update_grid <- function(forest_grid) {
       # Compute the probabilities of the propagate of the neighbours cells
       probs_propagate <- propagate(propagate_cell, neghs)
 
-      # Foraech of the neighbours for which we have the probs. of ignition
+      # Foreach of the neighbours for which we have the probs. of ignition
       # we sum it to the current prob. values of the forest_grid
-      # (Markov Chain) t_n = t_n-1 + added_prob
+      # (Markov Chain) t_n = t_n-1 + new_computed_prob
       for (negIndex in 1:length(neghs)) {
-        forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] <-
-          forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] + probs_propagate[[negIndex]]
+        neg_y <- neghs[[negIndex]][["coords.y"]]
+        neg_x <- neghs[[negIndex]][["coords.x"]]
+        
+        forest_grid$prob[neg_y, neg_x] <-
+          forest_grid$prob[neg_y, neg_x] + probs_propagate[[negIndex]]
       }
     }
   }
-
   return(forest_grid)
 }
 ```
 
+Test of the function
 ```{R}
-plot_probs_and_states <- function(forest_grid, probs = TRUE) {
-  flipped_grid <- apply(forest_grid$status, 2, rev)
+initial_forest <- initialize_grid(5, 5)
+filled_forest <- random_fill(initial_forest)
 
-  flipped_probs <- apply(forest_grid$prob, 2, rev)
+# Forest just initialized
+filled_forest
 
-  # Create a blank plot
-  plot(1, 1,
-    xlim = c(1, ncol(flipped_grid)), ylim = c(1, nrow(flipped_grid)),
-    type = "n", xlab = "", ylab = "", xaxt = "n", yaxt = "n"
-  )
+filled_forest <- update_grid(filled_forest)
 
-  # Draw rectangles for each cell
-  for (i in 1:nrow(flipped_grid)) {
-    for (j in 1:ncol(flipped_grid)) {
-      rect(j - 0.5, i - 0.5, j + 0.5, i + 0.5, col = cell_states_colors[flipped_grid[i, j]])
-    }
-  }
-
-  # Add probabilities on top of the rectangles
-  for (i in 1:nrow(flipped_probs)) {
-    for (j in 1:ncol(flipped_probs)) {
-      text(j, i, labels = ifelse(probs, flipped_probs[i, j], flipped_grid[i, j]), cex = 1.5)
-    }
-  }
-}
+# Forest after one step of update_grid (t + 1)
+filled_forest
 ```
+
 
 ## Adanced grid filling functions
 
+Previously we created a very basic function to fill our forest grid, in this section we will see how to make a more advanced version of it.
+
+The goal is to be able to "draw" a forest based on a generic function.
+
+To give an idea, we want to be able to draw a river (cell type water) with the shape of the sin function in a given span for x and y axis. Or any other "shape" with whichever cell type we want.
+
+### Generic fill grid function
+
+Firs we will need a very simple function that will set each cell to a given cell_type, based on the result of a "check function" called pos_func, with a given probability given by a generic "prob_func"
+
+Pseudocode
+```
+fill_grid is a function with parameters
+(forest_grid, pos_func, prob_func, cell_type)
+  foreach cell in forest_grid
+    if pos_func(y, x) is true
+      set the cell status to cell_type
+      set the cell prob to the value of prob_func(y,x)
+  return forest_grid
+```
+
+In the R code we added some customizations and other parameters to give more flexibility on the shape produced, like: 
+
+* Flip the orientation
+* Thickness of the "lines" / Precision of the pos_func
+
+R code
 ```{R}
-# Parametric function that enables the user to fill the forest with a specific function "shape"
-# and a specific probability function, with a desired cell_type
-fill_grid <- function(forest_grid, pos_func, prob_func, cell_type, thickness = 0.5, flip_orientation = FALSE) {
+fill_grid <- function(
+    forest_grid, pos_func, prob_func, 
+    cell_type, thickness = 0.5, flip_orientation = FALSE
+) {
   max_y <- dim(forest_grid$status)[1]
   max_x <- dim(forest_grid$status)[2]
 
@@ -614,20 +704,44 @@ fill_grid <- function(forest_grid, pos_func, prob_func, cell_type, thickness = 0
           forest_grid$status[y, x],
           cell_type
         )
-        forest_grid$prob[y, x] <- prob_func(x, y)
+        forest_grid$prob[y, x] <- prob_func(y, x)
       }
     }
   }
-
   return(forest_grid)
 }
+```
 
-# Function ultra-parametric that enables the user to fill the forest with a specific function "shape"
-# y, x are the coordinates of the point to be tested,
-# min_y, max_y, max_x will be used to handle the ratio/span of the function in the grid
-# func is the function used that will produce the value to compare with the thickness
-# thickness is the sensitivity/distance from the y,x coordinate and the actual function value
-# Returns true or false if the coordinate is or not generated by the function
+### Generic function to grid coordinates
+
+We cannot test the fill_grid function, unless we create some functions to pass to it.
+
+For this we will create a generic function that will map a given function (like sin, cos, exp, ecc.) to our grid coordinates.
+
+It will check if by overlapping the plot of the given function, the coordinates would end up near the values produced by the function.
+
+Pseudocode
+```
+func_fill is a function with parameters (y, x, func_span, func, thickness)
+  scale x to the func_span
+  scale y to the func_span
+  get y_func by calling func with x
+  return if y_scaled is near y_func (error < thickness)
+```
+
+Values in R code
+
+* y, x are the coordinates of the point to be tested,
+* min_y, max_y, max_x will be used to handle the ratio/span of the function in the grid
+
+* func is the function used that will produce the value to compare with the thickness
+
+* thickness is the sensitivity/distance from the y,x coordinate and the actual function value
+
+* Returns true or false if the coordinate is or not generated by the function
+
+R Code
+```{R}
 func_fill <- function(y, x, min_y, max_y, max_x, func, thickness) {
   # Scale y to the range of the sine function.
   # Put the 0 of the sin in the middle of my matrix
@@ -637,12 +751,39 @@ func_fill <- function(y, x, min_y, max_y, max_x, func, thickness) {
   x_scaled <- (x - max_x / 2) / (max_x / 2)
 
   # Calculate the y value of the sine wave at position x
-  y_sin <- func(x_scaled)
+  y_func <- func(x_scaled)
 
   # Check if the scaled y value is close to the y value of the sine wave
-  return(abs(y_scaled - y_sin) < thickness)
+  return(abs(y_scaled - y_func) < thickness)
 }
+```
 
+The func_fill will serve as an "interface" for all the position_functions that we may want to create.
+
+Here are the 3 position_functions that we created to generate some various scenarios.
+
+### Position functions
+
+#### Random variables for function span
+To produce each time random values/versions of the position_function we will need two random values, that will vary at each simulation.
+
+These two random variables will handle the span that we are looking into for each of the position_functions.
+
+R code
+```{R}
+rand_max_x <- pi * sample(10:50, 1)
+rand_min_y <- sample(2:20, 1)
+```
+
+Here is the definitions of random_position functions that we created.
+
+The way we create these is by "wrapping" the func_fill generic function with some predifined or randomly generated values, and with a specific func.
+
+#### Random position using runif() function
+
+R Code
+```{R}
+# It will produce a random pattern
 rand_pos <- function(y, x, max_y, thickness, flip_orientation = FALSE) {
   if (flip_orientation) {
     # Randomly change the function orientation
@@ -662,10 +803,11 @@ rand_pos <- function(y, x, max_y, thickness, flip_orientation = FALSE) {
     )
   )
 }
+```
 
-rand_max_x <- pi * sample(10:50, 1)
-rand_min_y <- sample(2:20, 1)
-
+#### Random position using Exponential function
+```{R}
+# It will produce a exp_lien function (straight river like)
 exp_pos <- function(y, x, max_y, thickness, flip_orientation = FALSE) {
   if (flip_orientation) {
     # Randomly change the function orientation
@@ -685,8 +827,10 @@ exp_pos <- function(y, x, max_y, thickness, flip_orientation = FALSE) {
     )
   )
 }
+```
 
-# Wrapper function for the func_fill
+#### Random position using Sin function
+```{R}
 # It will produce a sin_wave function (wavy river like)
 sin_pos <- function(y, x, max_y, thickness, flip_orientation = FALSE) {
   if (flip_orientation) {
@@ -709,32 +853,50 @@ sin_pos <- function(y, x, max_y, thickness, flip_orientation = FALSE) {
 }
 ```
 
-## F. Draft the simulate function
+## Simulate function
 
-Provide pseudocode to orchestrate the entire simu- lation over multiple iterations using the previously developed functions.
+The last piece of our simulation machine is the functio that will orchestrate every functionality that we developed until now.
 
-<!-- TODO: Write pseudocode -->
+We are talking about the simulate function.
 
+This function will generate a certain amount of simulations (forest_grids), for each of them it will step through the simulation a specific amount of times.
+
+In the end we will have run multiple simulations, based on randomly generated scenarios (forest_grids)
+
+Pseudocode
+```
+simulate is a function with parameters (t_max, n_sims, grid_rows, grid_cols)
+  for n_sims times
+    intialize a new forest_grid with dims grid_rows * grid_cols
+    randomly fill the forest_grid using random position_functions
+    set a random starting Burning cell
+    for t_max times
+      update the grid state
+```
+
+In the R code implementation there are some aspects that needed more attention than the pseudocode.
+
+* Randomize the position_functions values
+* Choose random scenarios and their values
+* Handle the production of a .gif or .mp4 file as result
+
+R code
 ```{R}
-rand_max_x <- pi * sample(10:50, 1)
-rand_min_y <- sample(2:20, 1)
-
-simulate <- function(t_max, N, grid_rows, grid_cols) {
+simulate <- function(t_max, N, grid_rows, grid_cols, debug = FALSE) {
   # N simulations, until t_max iterations
 
   for (i in 1:N) {
-    paste("Simulation", i)
+    if(debug) {paste("Simulation", i)}
 
     # Initialize the grid full of normal forest
     forest_grid <- initialize_grid(grid_rows, grid_cols)
 
-    # CUSTOMIZABLE PART -------------------------
 
     # Add random dry grass with some small self ignition probability
     forest_grid <- fill_grid(
       forest_grid = forest_grid,
       pos_func = rand_pos,
-      prob_func = function(y, x) 0.0002, # Starting Probability (self-ignition prob)
+      prob_func = function(y, x) 0.0002, # self-ignition prob
       cell_type = 2, # Dry grass
       thickness = runif(1, 0, 20) # Higher value = Higher population
     )
@@ -743,7 +905,7 @@ simulate <- function(t_max, N, grid_rows, grid_cols) {
     forest_grid <- fill_grid(
       forest_grid = forest_grid,
       pos_func = rand_pos,
-      prob_func = function(y, x) 0.00002, # Starting Probability (self-ignition prob)
+      prob_func = function(y, x) 0.00002, # self-ignition prob
       cell_type = 3, # Dense trees
       thickness = runif(1, 0, 20) # Higher value = Higher population
     )
@@ -753,20 +915,42 @@ simulate <- function(t_max, N, grid_rows, grid_cols) {
     rand_min_y <- sample(2:20, 1)
 
     # Adding a river with a random function plotted (exp or sin)
-    # I kept them separated and not param only the func_pos to be able to modify them separately
+    # I kept them separated and not param only 
+    # The func_pos to be able to modify them separately
     rand_value_river <- runif(1)
     water_type <- 0
     if (rand_value_river < 0.33) {
       # Exp function
-      forest_grid <- fill_grid(forest_grid, exp_pos, function(y, x) 0.0, 1, runif(1, 0.05, 0.3), ifelse(runif(1) < 0.5, TRUE, FALSE))
+      forest_grid <- fill_grid(
+        forest_grid, 
+        exp_pos, 
+        function(y, x) 0.0,
+        1, 
+        runif(1, 0.05, 0.3), 
+        ifelse(runif(1) < 0.5, TRUE, FALSE)
+      )
       water_type <- 0
     } else if (rand_value_river >= 0.33 && rand_value_river < 0.66) {
       # Random sin river
-      forest_grid <- fill_grid(forest_grid, sin_pos, function(y, x) 0.0, 1, runif(1, 0.05, 0.3), ifelse(runif(1) < 0.5, TRUE, FALSE))
+      forest_grid <- fill_grid(
+        forest_grid, 
+        sin_pos, 
+        function(y, x) 0.0, 
+        1, 
+        runif(1, 0.05, 0.3), 
+        ifelse(runif(1) < 0.5, TRUE, FALSE)
+      )
       water_type <- 1
     } else {
       # Random rain puddles
-      forest_grid <- fill_grid(forest_grid, rand_pos, function(y, x) 0.0, 1, runif(1, 0.05, 10), ifelse(runif(1) < 0.5, TRUE, FALSE))
+      forest_grid <- fill_grid(
+        forest_grid, 
+        rand_pos, 
+        function(y, x) 0.0,
+        1, 
+        runif(1, 0.05, 10), 
+        ifelse(runif(1) < 0.5, TRUE, FALSE)
+      )
       water_type <- 2
     }
 
@@ -786,48 +970,57 @@ simulate <- function(t_max, N, grid_rows, grid_cols) {
         forest_grid,
         paste(
           "Simulation n. ", i, " / ", N, "\nStep n. ", t, " / ", t_max,
-          "\n Water type: ", ifelse(water_type == 0, "Exp River", ifelse(water_type == 1, "Sin River", "Rain puddles"))
+          "\n Water type: ", 
+          ifelse(
+            water_type == 0, "Exp River", 
+            ifelse(water_type == 1, "Sin River", "Rain puddles")
+          )
         )
       )
-      print(paste("T: ", t, " / ", t_max))
+      if(debug) {print(paste("T: ", t, " / ", t_max))}
     }
-    print(paste(i, "| Simulation Completed"))
-
-
-
-    # Save the animation as a GIF
-    # saveGIF(ani.fun(), movie.name = paste("forest_simulation.gif"), interval = 0.2)
+    if(debug) {print(paste(i, "| Simulation Completed"))}
   }
 }
-
-# simulate(
-#   t_max = 20,
-#   N = 2,
-#   grid_rows = 100,
-#   grid_cols = 100
-# )
-
-# Gif
-# saveGIF(
-#   simulate(
-#     t_max = 50,
-#     N = 5,
-#     grid_rows = 100,
-#     grid_cols = 100
-#   ),
-#   movie.name = paste("forest_simulation.gif"),
-#   interval = 0.2
-# )
-
-# Movie
-# saveVideo(
-#   simulate(
-#     t_max = 10,
-#     N = 5,
-#     grid_rows = 50,
-#     grid_cols = 50
-#   ),
-#   video.name = paste("forest_simulation.mp4"),
-#   interval = 0.2
-# )
 ```
+
+## Run the simulation
+
+### Produce a gif
+
+Change to {R} code to execute
+```
+# GIF
+saveGIF(
+ simulate(
+   t_max = 50,
+   N = 3,
+   grid_rows = 100,
+   grid_cols = 100,
+   debug = TRUE
+ ),
+ movie.name = paste("forest_simulation.gif"),
+ interval = 0.2
+)
+```
+
+### Produce a mp4
+Save the result in a MP4
+
+Change to {R} code to execute
+```
+# MP4
+saveVideo(
+ simulate(
+   t_max = 10,
+   N = 5,
+   grid_rows = 100,
+   grid_cols = 100
+ ),
+ video.name = paste("forest_simulation.mp4"),
+ interval = 0.2
+)
+```
+
+# Analysis of update_grid function
+
