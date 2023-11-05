@@ -186,7 +186,7 @@ red for Burning areas, etc.).
 <!-- TODO: Add pseudocode -->
 
 ```{r}
-plot_grid <- function(forest_grid) {
+plot_grid <- function(forest_grid, plot_title = NULL) {
   forest_grid <- forest_grid$status
 
   # Increase the size of the color matrix
@@ -202,11 +202,21 @@ plot_grid <- function(forest_grid) {
     type = "n",
     xlim = c(0, ncol_enlarged),
     ylim = c(0, nrow_enlarged),
-    xlab = "", ylab = "", xaxt = "n", yaxt = "n",
+    xlab = "", ylab = "", xaxt = "n", yaxt = "n"
   )
 
+  # Add the title to the plot
+  if (!is.null(plot_title)) {
+    title(main = plot_title)
+  }
+
   # Create a color matrix
-  color_matrix <- matrix(cell_states_colors[enlarged_forest_grid], nrow = nrow_enlarged, ncol = ncol_enlarged, byrow = TRUE)
+  color_matrix <- matrix(
+    cell_states_colors[enlarged_forest_grid],
+    nrow = nrow_enlarged,
+    ncol = ncol_enlarged,
+    byrow = TRUE
+  )
 
   # Convert the color matrix to an image
   img <- as.raster(color_matrix)
@@ -508,30 +518,41 @@ simulate <- function(t_max, N, grid_rows, grid_cols) {
     forest_grid$status[sample(1:grid_rows, 1), sample(1:grid_cols, 1)] <- 4
 
     # Define the animation function
-    ani.fun <- function() {
-      for (t in 1:t_max) {
-        # Print the current iteration
-        # paste("Iteration", t)
-        # Update the grid
-        forest_grid <- update_grid(forest_grid)
 
-        # Plot the grid
-        plot_grid(forest_grid)
-        print(paste("T: ", t, " / ", t_max))
-      }
-      print(paste(i, "| Simulation Completed"))
+    for (t in 1:t_max) {
+      # Print the current iteration
+      # paste("Iteration", t)
+      # Update the grid
+      forest_grid <- update_grid(forest_grid)
+
+      # Plot the grid
+      plot_grid(forest_grid, paste("Simulation n. ", i, " / ", N,"\nStep n. ", t, " / ", t_max))
+      print(paste("T: ", t, " / ", t_max))
     }
+    print(paste(i, "| Simulation Completed"))
+
 
 
     # Save the animation as a GIF
-    saveGIF(ani.fun(), movie.name = paste("forest_simulation.gif"), interval = 0.2)
+    # saveGIF(ani.fun(), movie.name = paste("forest_simulation.gif"), interval = 0.2)
   }
 }
 
 simulate(
-  t_max = 100,
-  N = 3,
+  t_max = 20,
+  N = 2,
   grid_rows = 100,
   grid_cols = 100
+)
+
+saveGIF(
+  simulate(
+    t_max = 10,
+    N = 3,
+    grid_rows = 100,
+    grid_cols = 100
+  ),
+  movie.name = paste("forest_simulation.gif"),
+  interval = 0.4
 )
 ```
