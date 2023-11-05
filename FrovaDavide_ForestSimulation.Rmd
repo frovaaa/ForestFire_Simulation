@@ -2,11 +2,11 @@
 title: "Assignment 1 - Forest Fire Simulation - Probability and Statistics 2023"
 author: "Frova Davide"
 output:
-  html_document:
-    df_print: paged
+  pdf_document: default
   word_document: default
   html_notebook: default
-  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 # Notes
@@ -577,34 +577,34 @@ simulate <- function(t_max, N, grid_rows, grid_cols) {
   }
 }
 
-simulate(
-  t_max = 20,
-  N = 2,
-  grid_rows = 100,
-  grid_cols = 100
-)
+# simulate(
+#   t_max = 20,
+#   N = 2,
+#   grid_rows = 100,
+#   grid_cols = 100
+# )
 
 # Gif
-saveGIF(
-  simulate(
-    t_max = 50,
-    N = 5,
-    grid_rows = 100,
-    grid_cols = 100
-  ),
-  movie.name = paste("forest_simulation.gif"),
-  interval = 0.2
-)
+# saveGIF(
+#   simulate(
+#     t_max = 50,
+#     N = 5,
+#     grid_rows = 100,
+#     grid_cols = 100
+#   ),
+#   movie.name = paste("forest_simulation.gif"),
+#   interval = 0.2
+# )
 
 # Movie
-saveVideo(
-  simulate(
-    t_max = 10,
-    N = 5,
-    grid_rows = 50,
-    grid_cols = 50
-  ),
-  video.name = paste("forest_simulation.mp4"),
-  interval = 0.2
-)
+# saveVideo(
+#   simulate(
+#     t_max = 10,
+#     N = 5,
+#     grid_rows = 50,
+#     grid_cols = 50
+#   ),
+#   video.name = paste("forest_simulation.mp4"),
+#   interval = 0.2
+# )
 ```
