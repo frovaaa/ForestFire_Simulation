@@ -1012,10 +1012,11 @@ Change to {R} code to execute
 # MP4
 saveVideo(
  simulate(
-   t_max = 10,
-   N = 5,
-   grid_rows = 100,
-   grid_cols = 100
+   t_max = 30,
+   N = 3,
+   grid_rows = 50,
+   grid_cols = 50,
+   debug = TRUE
  ),
  video.name = paste("forest_simulation.mp4"),
  interval = 0.2
@@ -1024,3 +1025,79 @@ saveVideo(
 
 # Analysis of update_grid function
 
+## Random variables
+
+In the implementation of the update_grid function we used 2 random variables:
+
+The first one is a discrete random variable, and it is responsible of the change of state of a cell to a Burning state.
+
+It is a Bernoulli random variable which will define the next state of the cell.
+
+Let $S$ be a Bernoulli random variable with parameter $p_i$, where $p_i$ is the probability of ignition for cell $i$.
+
+Then the probability mass function of $S$ is given by:
+
+$$
+P(S = k) = 
+\begin{cases} 
+p_i & \text{if } k = 1, \text{ i.e., the cell changes to a Burning state}, \\
+1 - p_i & \text{if } k = 0, \text{ i.e., the cell does not change to a Burning state}.
+\end{cases}
+$$
+
+During the execution of the _update_grid_ function, for each cell $i$, we generate a random value and compare it with $p_i$ to determine the next state of the cell.
+
+Each cells probability of ignition is assigned at grid initialization and updated during the _update_grid_ execution.
+
+
+The second one is the same as the previous one, but it handles the change to Burned state of a Burning cell.
+
+In the first case, the _to Burning_ step, would not have any effects on the probabilities if the result was k=0.
+
+In the _to Burned_ process a result of k=0 would result in the increase of the probability of the cell by a predefined amount, 0.3 in our implementation.
+
+
+## Random number generators
+
+The values to be compared to the probabilities in the previous section need to be somehow generated at runtime.
+
+In our implementation we use the R integrated function _runif()_ to generate a random continuous value from a uniform distribution between 0 and 1, or between our desired range of values.
+
+
+In other parts of the implementation, like in the simulation function, we used the R integrated function _sample()_ to produce a random discrete value from a choosen set of values.
+
+## Stochastic process
+
+Just by adding these 2 random variables, and by generating the initial grid also randomly, we are able to add stochasticity to our model.
+
+In this case the stochastic part is the random evolution of the cells to the Burning or Burned state.
+
+If we change the thresholds or how we generate this probabilities, we are able to achieve different scenarios.
+
+In our general case we have that the fire spreads at a certain "speed", and it will not that easily burn out before spreading to the whole forest grid.
+But if we would increase the _to Burned_ transition probability we might get a simulation were the fire burns out immediately.
+
+This is all to say that with the addition of those random variables, and the probabilities chosen we will always have a different result for each simulation run.
+
+## Markov Chain characteristics
+
+We already cited before in the implementation that our model structure can be seen as a Markov Chain.
+
+In this case each of the grid cells has its own Markov Chain development, this means that we have m*n markov chains if m and n are the rows and cols of the grid.
+
+The states of the Markov Chain are the types that the cell can assume, but they do not directly correspond to our definition of cell states, but to a subset of those.
+
+In particular the states of the Markov Chains are:
+
+* Not Burning
+* Burning
+* Burned
+
+In which the Not Burning corresponds to any of starting types.
+Each of the cells can then, during the update_grid execution, change their state from _Not Burning_ to _Burning_ to _Burned_.
+
+We need to specify that these transformations are one-way, that means that after you "evolve" to the next state, you have no way of coming back.
+
+At least, this is how we decided to implement the model, a possibility would be to make a _Burned_ cell have a probability of _Reignition_ i.e. to go back to the _Burning_ state.
+
+We can also see an interesting aspect, in this type of simulation, the different Markov Chain interact with each other, as the state of one Markov Chain will affect the neighbours Markov Chains.
