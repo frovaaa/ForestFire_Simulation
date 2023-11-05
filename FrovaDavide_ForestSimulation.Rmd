@@ -132,19 +132,19 @@ func_fill <- function(y, x, min_y, max_y, max_x, func, thickness) {
 
 # Wrapper function for the func_fill
 # It will produce a sin_wave function (wavy river like)
-sin_pos <- function(y, x, max_y, thickness) {
-  return(
-    func_fill(
-      y = y,
-      x = x,
-      min_y = 0,
-      max_y = max_y,
-      max_x = pi / 10,
-      func = sin,
-      thickness = thickness # 0.3
-    )
-  )
-}
+# sin_pos <- function(y, x, max_y, thickness) {
+#   return(
+#     func_fill(
+#       y = y,
+#       x = x,
+#       min_y = 0,
+#       max_y = max_y,
+#       max_x = pi / 10,
+#       func = sin,
+#       thickness = thickness # 0.3
+#     )
+#   )
+# }
 
 rand_pos <- function(y, x, max_y, thickness) {
   return(
@@ -172,6 +172,20 @@ exp_pos <- function(y, x, max_y, thickness) {
       max_y = max_y,
       max_x = rand_max_x,
       func = exp,
+      thickness = thickness # 0.3
+    )
+  )
+}
+
+sin_pos <- function(y, x, max_y, thickness) {
+  return(
+    func_fill(
+      y = y,
+      x = x,
+      min_y = max_y * rand_min_y,
+      max_y = max_y,
+      max_x = rand_max_x,
+      func = sin,
       thickness = thickness # 0.3
     )
   )
@@ -511,8 +525,16 @@ simulate <- function(t_max, N, grid_rows, grid_cols) {
     rand_max_x <- pi * sample(10:50, 1)
     rand_min_y <- sample(2:20, 1)
 
-    # Adding a river with a random exp function plotting
-    forest_grid <- fill_grid(forest_grid, exp_pos, function(y, x) 0.0, 1, runif(1, 0.05, 0.2))
+    # Adding a river with a random function plotted
+    if(runif(1) < 0.5){
+      # Exp function
+      print("Exp River")
+      forest_grid <- fill_grid(forest_grid, exp_pos, function(y, x) 0.0, 1, runif(1, 0.05, 0.2))
+    } else {
+      # Random sin river
+      print("Sin River")
+      forest_grid <- fill_grid(forest_grid, sin_pos, function(y, x) 0.0, 1, runif(1, 0.05, 0.2))
+    }
 
     # Random starting point burning
     forest_grid$status[sample(1:grid_rows, 1), sample(1:grid_cols, 1)] <- 4
@@ -547,12 +569,12 @@ simulate(
 
 saveGIF(
   simulate(
-    t_max = 10,
+    t_max = 50,
     N = 3,
     grid_rows = 100,
     grid_cols = 100
   ),
   movie.name = paste("forest_simulation.gif"),
-  interval = 0.4
+  interval = 0.2
 )
 ```
