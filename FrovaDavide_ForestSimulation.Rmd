@@ -1,5 +1,6 @@
 ---
-title: "Assignment 1 - Forest Fire Simulation - Probability and Statistics 2023"
+title: "Forest Fire Propagation: A Cellular Automata Approach"
+subtitle: "Assignment 1b | Probability & Statistics SA 2023-2024"
 author: "Frova Davide"
 output:
   pdf_document: default
@@ -9,43 +10,57 @@ output:
     df_print: paged
 ---
 
-# Notes
-- Grid
-- Each cell represents a portion of the forest:
-  - Unburned
-  - Burning
-  - Burned
-- If adjacent to a burning and unburned: Can ignite with prob `p`
-- If unburned can ignite spontaneously with small prob `p_start`
-- Bayes:
-  - Likelihood of igniting by neighbor = P (Si(t + 1) = burning|Si_neighbors (t) = burning) = p
-  - Lieklihood of igniting spontaneous = P (Si(t + 1) = burning) = p_start
-- A burning cell transitions into a burned cell in the next time step.
-- Burned and unburned cells retain their states unless altered by the above conditions.
+# Abstract
 
+The simulation that we are going to create will represent a forest made of different types of vegetation.
 
-# Design the pseudocode for the forest fire model:
-## A. Design the initialize_grid function
+By spontaneous ignition or by a predifined starting point a forest fire born and spread, evolving in time in a Markov Chain manner.
 
-Develop pseudocode for the initialize grid
-function that outputs a m × n grid, where each point represents a portion of the forest. Your map
-should include at least one water body (Water), a few patches of dry grass (DryGrass), areas with
-dense trees (DenseTrees), and a few initially burning areas (Burning). Label the rest of the areas
-as NormalForest. This grid will represent the initial state of the forest before the fire simulation
-begins.
+Each cell will have a certain probability of ignition/burnout, which will be affected by it's previous state and the state of it's neighbours.
 
+The probabilities will be affected by different factors:
 
-<!-- TODO: Add pseudocode -->
+-   Specific cell type / state
+-   Near by cells types / states
+-   Natural events and characteristics
+-   Presents of puddles of water
+-   Presents of different kind of rivers
+-   Wind
+-   Altitude
+
+## Premise about code development
+
+The development of some parts of the code that will follow were done with the help of the tool Github Copilot Chat, this was to fill in the missing syntax/functions knowledge about the R language. The tool was generating snippets of code to show examples on the usage of certain R functions, and it was mainly generating explanations about R functionalities, and as an help in finding not so easy to spot bugs and fixes to various problems.
+
+# Design and Implementation of the Forest Fire Model
+
+## Preparation-Step: Including the necessary external libraries
 
 ```{R}
-# Install and load the rgl package
-if (!require(rgl)) install.packages("rgl")
-library(rgl)
 # Install and load the animation package
 if (!require(animation)) install.packages("animation")
 library(animation)
 ```
 
+## Defining the different types of cells
+
+Here is the definition of the different cell types / states.
+
+We will refer to *cell type* to indicate the type of the cell when we are looking at the forest model in a fixed time, and to *cell status/state* when we are in a on-going time frame, were the *type* of the cells is varying through time.
+
+Pseudocode:
+
+```
+cell_states is a dictionary/set of states
+  1. water
+  2. dryGrass
+  3. denseTrees
+  4. burning
+  5. normalForest
+  6. burned
+```
+
+R code:
 
 ```{r}
 cell_states <- c(
@@ -56,37 +71,535 @@ cell_states <- c(
   "NormalForest", # 5
   "Burned" # 6
 )
+```
 
+We preferred using the indexes to refer to a cell_state in the following code sections. The cell_states dictionary names will be used in the plot visualization, as a legend for the color coding.
+
+## Initialization of the forest grid
+
+The forest will be represented by an n\*m grid / matrix, each cell has it's type defined (index in the dictionary of types) and it's own probability of ignition/burnout.
+
+In this function we will create the matrix and set the default value of the status and probability.
+
+Pseudocode
+
+```
+initialize_grid is a function with parameters (n rows, m cols)
+  grid is a matrix n by m
+  foreach element of grid
+    set the status field to normalForest
+    set the probability to 0.0
+  return the grid
+```
+
+R code:
+
+```{R}
+initialize_grid <- function(rows, cols) {
+  # Create a list of matrices
+  # status will store the status of the cells
+  # prob   will store the probability of the cells
+  grid <- list(
+    "status" = matrix(nrow = rows, ncol = cols),
+    "prob" = matrix(nrow = rows, ncol = cols)
+  )
+
+  # Foreach element set the status and probability
+  for (y in 1:rows) {
+    for (x in 1:cols) {
+      grid$status[y, x] <- 5 # Normal Forest
+      grid$prob[y, x] <- 0.0
+    }
+  }
+  return(grid)
+}
+```
+
+In the R code we have different ways of creating a matrix that for each cell contains 2 fields.
+
+In this case we chose to create a matrix for the statuses and a matrix for the probabilities. Then we store these two matrices in a list called *grid*
+
+Test of the function
+
+```{R}
+initial_forest <- initialize_grid(3, 3)
+initial_forest  # Original Values
+
+# Set the status matrix with the names of the states
+initial_forest$status <- matrix(
+  sapply(
+    initial_forest$status, 
+    function (val) cell_states[val]),
+    nrow = nrow(initial_forest$status),
+    ncol = ncol(initial_forest$status
+  )
+)
+
+initial_forest  # Names instead of values
+```
+
+## Filling the grid randomly
+
+Now we generated a grid with default values inside. We could run a simulation based on it, but in our case we want more interesting characteristics to observe. That's why we will develop some functions to fill the forest grid in random and semi-random ways with other values for the cell types.
+
+### Random values for the cell states
+
+A basic first approach is to assign to each cell of the grid a random value from the cell_states dictionary
+
+Pseudocode
+
+```
+random_fill is a function with parameters (forest_grid)
+  foreach cell in forest_grid
+    new_status is a random pick from cell_states
+    set the cell "status" field to new_status
+```
+
+R code:
+
+```{R}
+random_fill <- function(forest_grid){
+  max_y <- dim(forest_grid$status)[1]
+  max_x <- dim(forest_grid$status)[2]
+  for (y in 1:max_y) {
+    for (x in 1:max_x) {
+      # Sample from the indexes of the cell_states 
+      status <- sample(1:length(cell_states), 1)
+      forest_grid$status[y, x] <- status
+    }
+  }
+  return (forest_grid)
+}
+```
+
+Test of the function
+
+```{R}
+initial_forest <- initialize_grid(3, 3)
+filled_forest <- random_fill(initial_forest)
+filled_forest
+```
+
+We will further develop more advanced ways of filling the grid, but for now this is enough to continue with the definition of other core functionalities.
+
+## Design of the plot_grid function
+
+Now that we have a way of randomly generate the forest grid, we can think of a way to visualize it.
+
+Printing it with the matrix R representation is not the best as we saw before, so we are going to develop a function to plot our matrix in a color coded way.
+
+Each color will represent a different type of cell.
+
+### Color palette
+
+First we define a color palette to represent the different cells
+
+Pseudocode
+
+```
+cell_states_colors is a dictionary containing colors
+  1. Water color
+  2. Dry grass color
+  3. Dense trees color
+  4. Buring/Fire color
+  5. Normal forest color
+  6. Burned color
+```
+
+R code
+
+```{R}
 cell_states_colors <- c(
   "#0000FF", # Blue / Water
   "#ADFF2F", # GreenYellow / DryGrass
   "#006400", # DarkGreen / DenseTrees
   "#FF0000", # Red / Burning
   "#008000", # Green / NormalForest
-  "#201F1F" # DarkGray / Burned
+  "#201F1F"  # DarkGray / Burned
 )
+```
 
-# Initialize grif function
-initialize_grid <- function(rows, cols) {
-  # Create a list to store the grid
-  grid <- list(
-    "status" = matrix(nrow = rows, ncol = cols),
-    "prob" = matrix(nrow = rows, ncol = cols)
+We represent the colors using the hexadecimal values, one for each of the cell types.
+
+### Plot grid function
+
+Now we can define a function that will plot a representation of our matrix, that will create a rectangle/square for each cell, with the corresponding status color.
+
+Pseudocode
+
+```
+plot_grid is a function with parameters (forest_grid, cell_states_colors)
+  foreach row of forest_grid
+    row_of_cells is an empty list
+    foreach cell in the current row
+      add a rectangle with the corresponding cell state color to the list
+    plot the row_of_cells with the rectangles in line
+    go to a new line in the plot
+```
+
+The R code implementation varied a lot during the development. The main changes where:
+
+-   Adding a title with various information to the plot
+-   Optimization in terms of speed of the plotting function
+-   Optimization of the quality of the produced plot
+
+This was the first implementation
+
+```{R}
+plot_grid <- function(forest_grid) {
+  # I flip&transpose the grid for better visualization 
+  # and consistency with the print of the values (0,0 top left)
+  flipped_grid <- apply(forest_grid, 2, rev)
+  transposed_again <- t(flipped_grid)
+  
+  # Get unique values to only take the colors needed 
+  # (image() will be angry otherwise)
+  colors <- sort(unique(as.vector(forest_grid)))
+  
+  # Map each cell status to its color
+  colors <- sapply(colors, function(val) cell_states_colors[val])
+  
+  # Print the image of the grid
+  image(transposed_again, col = colors)
+}
+```
+
+This is the final implementation with the above listed changes
+
+R code
+
+```{r}
+plot_grid <- function(forest_grid, plot_title = NULL) {
+  # We will be working only on the status matrix
+  forest_grid <- forest_grid$status
+
+  # Increase the size of the grid matrix
+  # This is to achieve a plot/graphic with higher quality
+  # Each cell is now 10 cells
+  # thanks to Github Copilot Chat
+  enlarged_forest_grid <- 
+    kronecker(
+      forest_grid, 
+      matrix(1, nrow = 10, ncol = 10)
+    )
+
+  # Get the number of rows and columns of the enlarged matrix
+  nrow_enlarged <- dim(enlarged_forest_grid)[1]
+  ncol_enlarged <- dim(enlarged_forest_grid)[2]
+
+  # Create an empty plot
+  plot(
+    0, 0,
+    type = "n",
+    xlim = c(0, ncol_enlarged),
+    ylim = c(0, nrow_enlarged),
+    xlab = "", ylab = "", xaxt = "n", yaxt = "n",
+    asp = 1
   )
 
-  for (y in 1:rows) {
-    for (x in 1:cols) {
-      # Sample from the indexes of the cell_states dictionary (without the burned state)
-      # status <- sample(seq_along(head(cell_states, -1)), 1)
-      status <- 5
-      grid$status[y, x] <- status
-      grid$prob[y, x] <- 0.0
+  # Add the title to the plot
+  if (!is.null(plot_title)) {
+    title(main = plot_title)
+  }
+
+  # Create a color matrix
+  # This will map each cell status to its cell_status_color
+  color_matrix <- matrix(
+    cell_states_colors[enlarged_forest_grid],
+    nrow = nrow_enlarged,
+    ncol = ncol_enlarged,
+    byrow = TRUE
+  )
+
+  # Convert the color matrix to an image
+  # Using raster for faster plotting
+  img <- as.raster(color_matrix)
+
+  # Draw the image
+  rasterImage(img, 0, 0, ncol_enlarged, nrow_enlarged)
+  
+  # Add a legend
+  legend(
+    "bottomright",  # Position of the legend
+    legend = cell_states,  # Labels for the legend items
+    fill = cell_states_colors,  # Colors for the legend items
+    cex = 0.8,  # Size of the legend items
+    title = "Cell States"  # Title of the legend
+  )
+}
+```
+
+Test of the function
+
+```{R}
+initial_forest <- initialize_grid(50, 50)
+filled_forest <- random_fill(initial_forest)
+plot_grid(filled_forest, "50 x 50 Random Forest")
+```
+
+## Develop the neighbours function
+
+A main key point of the evolution of the forest grid are the neighbours of a given cell.
+
+This is because the probability of a cell to ignite, is the sum of the probabilities of it's neighbours to ignite it.
+
+In other words, to determine if a cell becomes Burning, we need to check if its neighbours would spread fire to it or no.
+
+Here is the pseudocode to detect the list of neighbours of a cell at position y, x
+
+Pseudocode
+
+```
+neighbours is a function with parameters (forest_grid, y, x)
+  neghs_pos is a list of possible neighbours positions given y,x
+    (y - 1, x - 1),     # Top left
+    (y, x - 1),         # Top center
+    (y + 1, x - 1),     # Top right
+    (y - 1, x),         # Center left
+    (y + 1, x),         # Center right
+    (y - 1, x + 1),     # Bottom left
+    (y, x + 1),         # Bottom center
+    (y + 1, x + 1)      # Bottom right
+  
+  valid_neghs is an empty list neighbours positions
+  
+  foreach neghs_pos
+    if the position is valid (inside the grid)
+      add the neighbour position to valid_neghs
+  
+  return valid_neghs
+```
+
+In the actual R code we did two main changes.
+
+We define a neighbour as a more complex object, we do not store only the position but also the current state of the cell given by the corresponding *forest_grid\$status* value.
+
+The neighbour has the following structure:
+
+```         
+neighbour:
+  "state" : val
+  "coords :
+    "x" : val
+    "y" : val
+```
+
+And secondly we do not take the y and x values as single parameters but inside a cell array of dim=2, which is composed as (y, x).
+
+R code
+
+```{R}
+neighbours <- function(forest_grid, cell) {
+  x <- cell[2]
+  y <- cell[1]
+
+  max_x <- dim(forest_grid$status)[2]
+  max_y <- dim(forest_grid$status)[1]
+
+  # Possible neighbours coordinates
+  result <- list(
+    c(y - 1, x - 1),     # Top left
+    c(y, x - 1),         # Top center
+    c(y + 1, x - 1),     # Top right
+    c(y - 1, x),         # Center left
+    c(y + 1, x),         # Center right
+    c(y - 1, x + 1),     # Bottom left
+    c(y, x + 1),         # Bottom center
+    c(y + 1, x + 1)      # Bottom right
+  )
+
+  # Final list with the valid neighbours
+  valid_result <- list()
+
+  for (negh in result) {
+    # Check if it is a valid coordinate
+    if (negh[1] > 0 && negh[2] > 0 && negh[2] <= max_x && negh[1] <= max_y) {
+      # Create the neighbour object
+      negh_obj <- c(
+        "state" = forest_grid$status[negh[1], negh[2]],
+        "coords" = c(
+          "x" = negh[2],
+          "y" = negh[1]
+        )
+      )
+      # Append to the valid_result
+      valid_result <- append(valid_result, list(negh_obj))
+    }
+  }
+  return(valid_result)
+}
+```
+
+Test of the function
+
+```{R}
+initial_forest <- initialize_grid(3, 3)
+filled_forest <- random_fill(initial_forest)
+
+filled_forest$status
+
+# Corner position gives us 3 neighbours
+neighbours(filled_forest, c(1, 1))
+```
+
+## D. Construct the propagate function
+
+Draft pseudocode to manage fire propagation based on: - The type of area - Its current state - Neighboring cell states.
+
+<!-- TODO: Add pseudocode -->
+
+```{R}
+# Example output:
+# [1] 0.3 0.0 0.0
+
+
+
+# "Water",          # 1
+# "DryGrass",       # 2
+# "DenseTrees",     # 3
+# "Burning",        # 4
+# "NormalForest"    # 5
+
+# Cell:
+# cell <- c(
+#   "state" = 1--5,
+#   "coords" = c(
+#     "x" = 1,
+#     "y" = 1
+#   )
+# )
+propagate <- function(cell, neighbours) {
+  if (cell[["state"]] != 4) {
+    return(sapply(neighbours, function(val) 0.0))
+  }
+
+  neghs_probs <- sapply(neighbours, function(neg) {
+    return(
+      switch(neg[["state"]],
+        "1" = 0.0, # max = 0.0
+        "2" = 0.125, # max = 1.0
+        "3" = 0.05, # max = 0.4
+        "4" = 0.0, # max = 0.0
+        "5" = 0.0875, # max = 0.7
+        "6" = 0.0 # max = 0.0
+      )
+    )
+  })
+
+  return(neghs_probs)
+}
+```
+
+## E. Design the update_grid function:
+
+Develop pseudocode to manage fire dynamics and grid updates using the neighbours and propagate functions.
+
+<!-- TODO: Add pseudocode -->
+
+```{R}
+# "Water",          # 1
+# "DryGrass",       # 2
+# "DenseTrees",     # 3
+# "Burning",        # 4
+# "NormalForest"    # 5
+# "Burned"          # 6
+
+update_grid <- function(forest_grid) {
+  for (y in 1:nrow(forest_grid$status)) {
+    for (x in 1:ncol(forest_grid$status)) {
+      # Get the current cell state
+      cell_state <- forest_grid$status[y, x]
+      cell_prob <- forest_grid$prob[y, x]
+
+      # If the cell could burn, generate a random number and check with its probability
+      # if so, set them to burning and reset their prob
+      if (cell_state == 2 || cell_state == 3 || cell_state == 5) {
+        rand_value <- runif(1)
+        if (rand_value <= cell_prob) {
+          forest_grid$status[y, x] <- 4
+          forest_grid$prob[y, x] <- 0.0
+
+          cell_state <- 4
+          cell_prob <- 0.0
+        }
+      } else if (cell_state == 4) {
+        # If the cell is burning, and the random value gets the prob
+        # set it to burned and reset its prob, otherwise increase the prob of going out
+
+        rand_value <- runif(1)
+        if (rand_value <= cell_prob) {
+          forest_grid$status[y, x] <- 6
+          forest_grid$prob[y, x] <- 0.0
+
+          cell_state <- 6
+          cell_prob <- 0.0
+        } else {
+          # Increase the probability of going out
+          forest_grid$prob[y, x] <- forest_grid$prob[y, x] + 0.3
+          cell_prob <- cell_prob + 0.1
+        }
+      }
+
+      # Get the neighbours of the current cell
+      neghs <- neighbours(forest_grid = forest_grid["status"], cell = c(y, x))
+
+      # Create an "object" with the data needed from the propagate function
+      propagate_cell <- c(
+        "state" = cell_state,
+        "coords" = c(
+          "x" = x,
+          "y" = y
+        )
+      )
+
+      # Compute the probabilities of the propagate of the neighbours cells
+      probs_propagate <- propagate(propagate_cell, neghs)
+
+      # Foraech of the neighbours for which we have the probs. of ignition
+      # we sum it to the current prob. values of the forest_grid
+      # (Markov Chain) t_n = t_n-1 + added_prob
+      for (negIndex in 1:length(neghs)) {
+        forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] <-
+          forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] + probs_propagate[[negIndex]]
+      }
     }
   }
 
-  return(grid)
+  return(forest_grid)
 }
+```
 
+```{R}
+plot_probs_and_states <- function(forest_grid, probs = TRUE) {
+  flipped_grid <- apply(forest_grid$status, 2, rev)
+
+  flipped_probs <- apply(forest_grid$prob, 2, rev)
+
+  # Create a blank plot
+  plot(1, 1,
+    xlim = c(1, ncol(flipped_grid)), ylim = c(1, nrow(flipped_grid)),
+    type = "n", xlab = "", ylab = "", xaxt = "n", yaxt = "n"
+  )
+
+  # Draw rectangles for each cell
+  for (i in 1:nrow(flipped_grid)) {
+    for (j in 1:ncol(flipped_grid)) {
+      rect(j - 0.5, i - 0.5, j + 0.5, i + 0.5, col = cell_states_colors[flipped_grid[i, j]])
+    }
+  }
+
+  # Add probabilities on top of the rectangles
+  for (i in 1:nrow(flipped_probs)) {
+    for (j in 1:ncol(flipped_probs)) {
+      text(j, i, labels = ifelse(probs, flipped_probs[i, j], flipped_grid[i, j]), cex = 1.5)
+    }
+  }
+}
+```
+
+## Adanced grid filling functions
+
+```{R}
 # Parametric function that enables the user to fill the forest with a specific function "shape"
 # and a specific probability function, with a desired cell_type
 fill_grid <- function(forest_grid, pos_func, prob_func, cell_type, thickness = 0.5, flip_orientation = FALSE) {
@@ -196,299 +709,9 @@ sin_pos <- function(y, x, max_y, thickness, flip_orientation = FALSE) {
 }
 ```
 
-## B. Design the plot_grid function
-Provide pseudocode to visualize the current state
-of the grid using different colors for each type of area (e.g., blue for water, green for NormalForest,
-red for Burning areas, etc.).
-
-<!-- TODO: Add pseudocode -->
-
-```{r}
-plot_grid <- function(forest_grid, plot_title = NULL) {
-  forest_grid <- forest_grid$status
-
-  # Increase the size of the color matrix
-  enlarged_forest_grid <- kronecker(forest_grid, matrix(1, nrow = 10, ncol = 10))
-
-  # Get the number of rows and columns of the enlarged matrix
-  nrow_enlarged <- dim(enlarged_forest_grid)[1]
-  ncol_enlarged <- dim(enlarged_forest_grid)[2]
-
-  # Create an empty plot
-  plot(
-    0, 0,
-    type = "n",
-    xlim = c(0, ncol_enlarged),
-    ylim = c(0, nrow_enlarged),
-    xlab = "", ylab = "", xaxt = "n", yaxt = "n"
-  )
-
-  # Add the title to the plot
-  if (!is.null(plot_title)) {
-    title(main = plot_title)
-  }
-
-  # Create a color matrix
-  color_matrix <- matrix(
-    cell_states_colors[enlarged_forest_grid],
-    nrow = nrow_enlarged,
-    ncol = ncol_enlarged,
-    byrow = TRUE
-  )
-
-  # Convert the color matrix to an image
-  img <- as.raster(color_matrix)
-
-  # Draw the image
-  rasterImage(img, 0, 0, ncol_enlarged, nrow_enlarged)
-}
-
-# plot_grid(initial_state)
-```
-
-
-```{R}
-plot_3D <- function(forest_grid) {
-  flipped_grid <- apply(forest_grid$status, 2, rev)
-  transposed_status <- t(flipped_grid)
-
-  flipped_probs <- apply(forest_grid$prob, 2, rev)
-  transposed_probs <- t(flipped_probs)
-
-  # Create a 3D plot
-  x <- 1:ncol(transposed_status)
-  y <- 1:nrow(transposed_status)
-  z <- transposed_probs
-  colors <- cell_states_colors[transposed_status]
-  persp3d(x, y, z, col = colors, xlab = "X", ylab = "Y", zlab = "Prob")
-}
-
-# plot_3D(initial_state)
-# plot_3D(next_state)
-```
-
-## C. Develop the neighbours function
-Create pseudocode to identify neighboring cells
-of a given point.
-
-<!-- TODO: Add pseudocode 
-Initially saved only the coordinates,
-now i save state, and coordinates
--->
-
-```{R}
-# Example output:
-# [[1]]
-#    state coords.x coords.y
-#        3        2        1
-
-# [[2]]
-#    state coords.x coords.y
-#        4        1        2
-
-# [[3]]
-#    state coords.x coords.y
-#        1        2        2
-
-# forest_grid object
-neighbours <- function(forest_grid, cell) {
-  x <- cell[2]
-  y <- cell[1]
-
-  max_x <- dim(forest_grid$status)[2]
-  max_y <- dim(forest_grid$status)[1]
-
-  result <- list(
-    c(y - 1, x - 1), # Top left
-    c(y, x - 1), # Top center
-    c(y + 1, x - 1), # Top right
-    c(y - 1, x), # Center left
-    c(y + 1, x), # Center right
-    c(y - 1, x + 1), # Bottom left
-    c(y, x + 1), # Bottom center
-    c(y + 1, x + 1) # Bottom right
-  )
-
-  valid_result <- list()
-
-  for (negh in result) {
-    if (negh[1] > 0 && negh[2] > 0 && negh[2] <= max_x && negh[1] <= max_y) {
-      negh_obj <- c(
-        "state" = forest_grid$status[negh[1], negh[2]],
-        "coords" = c(
-          "x" = negh[2],
-          "y" = negh[1]
-        )
-      )
-
-      valid_result <- append(valid_result, list(negh_obj))
-    }
-  }
-
-  return(valid_result)
-}
-```
-
-## D. Construct the propagate function
-Draft pseudocode to manage fire propagation based on:
-- The type of area
-- Its current state
-- Neighboring cell states.
-
-<!-- TODO: Add pseudocode -->
-
-```{R}
-# Example output:
-# [1] 0.3 0.0 0.0
-
-
-
-# "Water",          # 1
-# "DryGrass",       # 2
-# "DenseTrees",     # 3
-# "Burning",        # 4
-# "NormalForest"    # 5
-
-# Cell:
-# cell <- c(
-#   "state" = 1--5,
-#   "coords" = c(
-#     "x" = 1,
-#     "y" = 1
-#   )
-# )
-propagate <- function(cell, neighbours) {
-  if (cell[["state"]] != 4) {
-    return(sapply(neighbours, function(val) 0.0))
-  }
-
-  neghs_probs <- sapply(neighbours, function(neg) {
-    return(
-      switch(neg[["state"]],
-        "1" = 0.0, # max = 0.0
-        "2" = 0.125, # max = 1.0
-        "3" = 0.05, # max = 0.4
-        "4" = 0.0, # max = 0.0
-        "5" = 0.0875, # max = 0.7
-        "6" = 0.0 # max = 0.0
-      )
-    )
-  })
-
-  return(neghs_probs)
-}
-```
-
-## E. Design the update_grid function:
-Develop pseudocode to manage fire dynamics
-and grid updates using the neighbours and propagate functions.
-
-<!-- TODO: Add pseudocode -->
-
-```{R}
-# "Water",          # 1
-# "DryGrass",       # 2
-# "DenseTrees",     # 3
-# "Burning",        # 4
-# "NormalForest"    # 5
-# "Burned"          # 6
-
-update_grid <- function(forest_grid) {
-  for (y in 1:nrow(forest_grid$status)) {
-    for (x in 1:ncol(forest_grid$status)) {
-      # Get the current cell state
-      cell_state <- forest_grid$status[y, x]
-      cell_prob <- forest_grid$prob[y, x]
-
-      # If the cell could burn, generate a random number and check with its probability
-      # if so, set them to burning and reset their prob
-      if (cell_state == 2 || cell_state == 3 || cell_state == 5) {
-        rand_value <- runif(1)
-        if (rand_value <= cell_prob) {
-          forest_grid$status[y, x] <- 4
-          forest_grid$prob[y, x] <- 0.0
-
-          cell_state <- 4
-          cell_prob <- 0.0
-        }
-      } else if (cell_state == 4) {
-        # If the cell is burning, and the random value gets the prob
-        # set it to burned and reset its prob, otherwise increase the prob of going out
-
-        rand_value <- runif(1)
-        if (rand_value <= cell_prob) {
-          forest_grid$status[y, x] <- 6
-          forest_grid$prob[y, x] <- 0.0
-
-          cell_state <- 6
-          cell_prob <- 0.0
-        } else {
-          # Increase the probability of going out
-          forest_grid$prob[y, x] <- forest_grid$prob[y, x] + 0.3
-          cell_prob <- cell_prob + 0.1
-        }
-      }
-
-      # Get the neighbours of the current cell
-      neghs <- neighbours(forest_grid = forest_grid["status"], cell = c(y, x))
-
-      # Create an "object" with the data needed from the propagate function
-      propagate_cell <- c(
-        "state" = cell_state,
-        "coords" = c(
-          "x" = x,
-          "y" = y
-        )
-      )
-
-      # Compute the probabilities of the propagate of the neighbours cells
-      probs_propagate <- propagate(propagate_cell, neghs)
-
-      # Foraech of the neighbours for which we have the probs. of ignition
-      # we sum it to the current prob. values of the forest_grid
-      # (Markov Chain) t_n = t_n-1 + added_prob
-      for (negIndex in 1:length(neghs)) {
-        forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] <-
-          forest_grid$prob[neghs[[negIndex]][["coords.y"]], neghs[[negIndex]][["coords.x"]]] + probs_propagate[[negIndex]]
-      }
-    }
-  }
-
-  return(forest_grid)
-}
-```
-
-```{R}
-plot_probs_and_states <- function(forest_grid, probs = TRUE) {
-  flipped_grid <- apply(forest_grid$status, 2, rev)
-
-  flipped_probs <- apply(forest_grid$prob, 2, rev)
-
-  # Create a blank plot
-  plot(1, 1,
-    xlim = c(1, ncol(flipped_grid)), ylim = c(1, nrow(flipped_grid)),
-    type = "n", xlab = "", ylab = "", xaxt = "n", yaxt = "n"
-  )
-
-  # Draw rectangles for each cell
-  for (i in 1:nrow(flipped_grid)) {
-    for (j in 1:ncol(flipped_grid)) {
-      rect(j - 0.5, i - 0.5, j + 0.5, i + 0.5, col = cell_states_colors[flipped_grid[i, j]])
-    }
-  }
-
-  # Add probabilities on top of the rectangles
-  for (i in 1:nrow(flipped_probs)) {
-    for (j in 1:ncol(flipped_probs)) {
-      text(j, i, labels = ifelse(probs, flipped_probs[i, j], flipped_grid[i, j]), cex = 1.5)
-    }
-  }
-}
-```
-
 ## F. Draft the simulate function
-Provide pseudocode to orchestrate the entire simu-
-lation over multiple iterations using the previously developed functions.
+
+Provide pseudocode to orchestrate the entire simu- lation over multiple iterations using the previously developed functions.
 
 <!-- TODO: Write pseudocode -->
 
